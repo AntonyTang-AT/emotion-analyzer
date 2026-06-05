@@ -1,33 +1,34 @@
 # Emotion Analyzer – 多模态情感计算系统
 
-> 基于六层流水线架构的 AI 情感分析系统，支持视频上传、实时摄像头分析、多模态矛盾检测、生成式报告与大五人格回归。
+> 基于六层流水线架构的 AI 情感分析系统，支持视频上传、实时摄像头分析、多模态矛盾检测、**动态路由权重**、生成式报告与大五人格回归。
 
 ## 📌 项目简介
 
-本项目是一个端到端的情感计算系统，能够从视频中提取文本、语音、宏表情、微表情四模态特征，预测效价（Valence）与唤醒度（Arousal），动态分段，检测模态间矛盾，生成自然语言报告，并推断用户的大五人格特质。
+本项目是一个端到端的情感计算系统，能够从视频中提取文本、语音、宏表情、微表情四模态特征，预测效价（Valence）与唤醒度（Arousal），动态分段，检测模态间矛盾，**输出各模态融合权重**，生成自然语言报告，并推断用户的大五人格特质。
 
 **主要特性：**
 
-- 🎥 **视频分析**：上传视频文件，获得完整的 VA 曲线、矛盾热力图、文本报告。
+- 🎥 **视频分析**：上传视频文件，获得完整的 VA 曲线、矛盾热力图、**模态信任权重时序图**、文本报告。
 - 🎙️ **实时摄像头分析**：通过 WebSocket 逐帧处理，实时绘制 VA 轨迹。
 - 🧠 **长效记忆**：基于 Chroma 向量数据库存储历史片段，支持冷启动与个性化基线。
-- 📊 **可视化输出**：VA 时序曲线、模态一致性热力图、人格雷达图。
+- 🎛️ **动态路由**：L4 矛盾检测输出 `suggested_fusion_weights`，指导 L5 报告生成和 L3 记忆检索。
+- 📊 **可视化输出**：VA 时序曲线、模态一致性热力图、人格雷达图、模态权重堆叠图。
 - 🧩 **模块化设计**：六层架构完全解耦，支持配置式启用/跳过任一层次。
 
 ## 🏗️ 技术架构
 
 ```
-视频输入 → L1 多模态特征提取 → L2 单模态 VA 预测 → L3 自适应分段 → L4 矛盾检测 → L5 生成式报告 → L6 人格回归
+视频输入 → L1 多模态特征提取 → L2 单模态 VA 预测（两分支） → L3 自适应分段 → L4 矛盾检测 + 路由权重 → L5 生成式报告 → L6 人格回归
 ```
 
 | 层级 | 名称 | 核心技术 |
 |------|------|----------|
-| L1 | 特征提取 | Whisper + BERT, Wav2Vec2+FoX, MediaPipe+VideoMAE, DGM+GCN |
-| L2 | VA 预测 | 轻量 MLP + 多任务联合优化 (EmoLILMs) |
-| L3 | 分段与个性化 | 动态分段控制器 + 基线校准 + 冷启动 + Chroma 记忆库 |
-| L4 | 矛盾检测 | VA 空间距离 + QBTD 阈值 + 专家规则 |
-| L5 | 报告生成 | DeepSeek/GPT 生成片段/整体报告 + 可视化 (Plotly/Matplotlib) |
-| L6 | 人格回归 | LightGBM / 高斯过程，输出大五人格分数 |
+| L1 | 特征提取 | Whisper + BERT, Wav2Vec2+FoX, MediaPipe+VideoMAE, DGM+GCN（含纯视觉旁路） |
+| L2 | VA 预测 | **两分支 MLP**：输出 `VA_self`（自建模）和 `VA_inter`（交互对齐） |
+| L3 | 分段与个性化 | 动态分段控制器 + 基线校准（用 VA_self）+ 冷启动 + Chroma 记忆库 |
+| L4 | 矛盾检测 + 路由 | VA 空间距离 + QBTD 阈值 + 专家规则，**输出融合权重** `suggested_fusion_weights` |
+| L5 | 报告生成 | DeepSeek/GPT，**权重引导 Prompt**，生成片段/整体报告 + 可视化 |
+| L6 | 人格回归 | LightGBM / 高斯过程，使用**加权统计量 + 纯视觉特征**，输出大五人格分数 |
 
 后端：FastAPI + SQLAlchemy + SQLite/PostgreSQL  
 前端：纯 HTML/CSS/JS + ECharts/Chart.js  
@@ -107,23 +108,26 @@ python -m http.server 3000
 ```
 emotion-analyzer/
 ├── config/               # 配置文件（YAML）
+│   └── weight_table.yaml # 新增：矛盾类型→融合权重映射表
 ├── src/                  # 核心算法库（六层模块化）
-│   ├── layer1_feature/   # 多模态特征提取
-│   ├── layer2_predict/   # VA 预测
+│   ├── layer1_feature/   # 多模态特征提取（含纯视觉旁路）
+│   ├── layer2_predict/   # VA 预测（两分支 MLP）
+│   │   └── two_branch_mlp.py  # 新增：两分支实现
 │   ├── layer3_segment/   # 自适应分段 + 记忆
-│   ├── layer4_contradiction/ # 矛盾检测
-│   ├── layer5_report/    # 报告生成
-│   ├── layer6_personality/   # 人格回归
+│   ├── layer4_contradiction/ # 矛盾检测 + 路由
+│   │   └── weight_selector.py # 新增：权重生成器
+│   ├── layer5_report/    # 报告生成（权重引导 Prompt）
+│   ├── layer6_personality/   # 人格回归（加权统计量）
 │   ├── pipeline/         # 流水线控制器
 │   └── utils/            # 通用工具
 ├── server/               # FastAPI 后端
 │   ├── api/              # 路由层
 │   ├── db/               # 数据库模型与操作
 │   ├── vector_store/     # Chroma 封装
-│   └── schemas/          # Pydantic 模型
+│   └── schemas/          # Pydantic 模型（含权重字段）
 ├── web/                  # 前端静态文件
 │   ├── index.html
-│   ├── js/               # API 调用、摄像头、图表
+│   ├── js/               # API 调用、摄像头、图表（新增权重图绘制）
 │   └── css/
 ├── data/                 # 运行时数据（上传文件、数据库、向量库）
 ├── logs/                 # 日志
