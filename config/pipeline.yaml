@@ -1,0 +1,68 @@
+# 流水线各层开关与数据流控制
+# use_va_type / embedding_source：self（自建模分支）| inter（交互分支）
+
+pipeline:
+  stages:
+    L1:
+      enabled: true
+      feature_extractors:
+        - text
+        - speech
+        - macro
+        - micro
+      preserve_raw_visual: true  # 保存纯视觉旁路到 DataContext
+
+    L2:
+      enabled: true
+      model_path: models/two_branch_va.pth
+      self_loss_weight: 0.3
+      inter_loss_weight: 0.7
+
+    L3:
+      enabled: true
+      segmentation:
+        arousal_threshold: 0.3       # 唤醒度变化率切分阈值
+        max_fragment_length: 30      # 最大片段长度（秒），超时强制切分
+        polarity_flip: true          # 愉悦度极性翻转时切分
+        modality_distance_threshold: 0.6  # 模态间最大距离阈值（前期可关闭）
+        use_va_type: inter           # 分段使用交互分支 VA
+        use_crm_window: false        # 可选 CRM 窗口优化
+      baseline:
+        enabled: true
+        use_va_type: self            # 基线校准使用自建模分支
+        calibration_videos: 3      # 标准情感刺激视频数量（3-5）
+        video_duration_sec: 15
+        delta_va_storage: data/processed/delta_va
+      cold_start:
+        enabled: true
+        embedding_source: self       # 冷启动相似用户匹配用自建模 VA
+        top_k_users: 5
+      memory:
+        enabled: true
+        db_path: data/chroma
+        decay_alpha: 0.1             # 时间衰减系数
+        top_k: 3
+        embedding_type: inter        # 默认检索用交互分支；矛盾时可切换 self
+
+    L4:
+      enabled: true
+      quadrant_thresholds: [0.50, 0.65, 0.70, 0.55]  # QBTD 四象限阈值
+      weight_strategy: rule_table    # rule_table | small_nn
+      rule_table_path: config/weight_table.yaml
+      routing_confidence_divisor: 1.2  # intensity / divisor 归一化上限
+
+    L5:
+      enabled: true
+      mode: online                   # online | offline
+      llm_model: deepseek            # deepseek | openai | qwen
+      use_l4_weights: true
+      segment_report_max_chars: 80
+      overall_report_max_chars: 300
+
+    L6:
+      enabled: true
+      min_fragments: 30
+      model_type: lightgbm           # lightgbm | gp
+      use_weighted_stats: true
+      use_raw_visual_features: true
+      llm_fallback_enabled: true

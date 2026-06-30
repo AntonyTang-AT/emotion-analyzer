@@ -1,0 +1,51 @@
+# L1 多模态特征提取参数
+
+text:
+  enabled: true
+  whisper_model: base          # base | small
+  bert_model: bert-base-uncased
+  embedding_dim: 768
+  language: auto
+
+speech:
+  enabled: true
+  wav2vec2_model: facebook/wav2vec2-base
+  sample_rate: 16000
+  embedding_dim: 1024
+  fox:
+    enabled: true
+    gamma: 0.1                 # FoX 时域衰减系数
+  prosody:
+    enabled: true
+    features: [f0, energy, zcr, mfcc]
+
+macro:
+  enabled: true
+  mediapipe_model: face_landmarker
+  videomae_model: MCG-NJU/videomae-small
+  face_landmarks: 468
+  roi_size: 224
+  clip_frames: 16
+  clip_stride: 8
+  embedding_dim: 512
+
+micro:
+  enabled: true
+  input_size: 112              # onset/apex 灰度图尺寸
+  dgm:
+    conv_layers: 5
+    lambda_smooth: 0.1
+    lambda_norm: 0.1
+  gcn:
+    layers: 2
+    hidden_dim: 128
+  embedding_dim: 256
+  weak_signal_amplify:
+    enabled: true
+    au_coefficients: 2.5       # 关键 AU 放大系数（2~3）
+    key_aus: [AU12, AU15]
+  preserve_raw_visual: true    # 纯视觉旁路写入 raw_visual_features
+
+visual_bypass:
+  enabled: true
+  modalities: [micro, macro]
