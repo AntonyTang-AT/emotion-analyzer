@@ -1,0 +1,79 @@
+# L2–L6 模型超参数
+
+layer2:
+  two_branch_mlp:
+    shared_dim: 256
+    branch_hidden: 128
+    dropout: 0.2
+    output_range: [-1, 1]      # valence / arousal 输出范围
+    modalities:
+      text:
+        input_dim: 768
+      speech:
+        input_dim: 1024
+      macro:
+        input_dim: 512
+      micro:
+        input_dim: 256
+  multitask:
+    learnable_loss_weights: true
+
+layer3:
+  segment:
+    arousal_threshold: 0.3
+    max_fragment_sec: 30
+    crm_window_range: [2, 30]
+  baseline:
+    calibration_videos_min: 3
+    calibration_videos_max: 5
+  memory:
+    embedding_self_dim: 8      # 4 模态 × 2 (V, A)
+    embedding_inter_dim: 8
+  domain_adapter:
+    enabled: false             # RSTR 域适应（可选）
+    rstr_feature_dim: 256
+
+layer4:
+  expert_rules:
+    # masking > sarcasm > hidden_emotion > intensity_mismatch
+    masking:
+      text_v_min: 0.6
+      micro_v_max: -0.4
+    sarcasm:
+      text_v_min: 0.3
+      speech_v_max: -0.4
+      macro_v_max: -0.4
+    hidden_emotion:
+      macro_v_abs_max: 0.2
+      micro_v_abs_min: 0.5
+    intensity_mismatch:
+      va_diff_min: 0.6
+
+layer5:
+  llm:
+    deepseek:
+      model: deepseek-chat
+      max_tokens: 512
+      temperature: 0.7
+    openai:
+      model: gpt-4o-mini
+      max_tokens: 512
+      temperature: 0.7
+  visualization:
+    va_curve: true
+    heatmap: true
+    weight_timeline: true
+
+layer6:
+  lightgbm:
+    n_estimators: 200
+    learning_rate: 0.05
+    max_depth: 6
+    traits: [O, C, E, A, N]
+    score_range: [1, 10]
+  gp:
+    enabled: false
+  evaluation:
+    mae_target: 0.8
+    pearson_target: 0.6
+    icc_target: 0.7

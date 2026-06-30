@@ -1,0 +1,8 @@
+# L4 矛盾类型 → 四模态融合权重 [text, speech, macro, micro]，各组和为 1.0
+# 来源：技术路线总指南 V2.0 / 具体核心项目结构 V2.0
+
+masking: [0.1, 0.2, 0.2, 0.5]
+sarcasm: [0.4, 0.4, 0.1, 0.1]
+hidden_emotion: [0.1, 0.1, 0.1, 0.7]
+intensity_mismatch: [0.3, 0.2, 0.3, 0.2]
+consistent: [0.25, 0.25, 0.25, 0.25]

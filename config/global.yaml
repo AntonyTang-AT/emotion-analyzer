@@ -1,0 +1,41 @@
+# 全局运行配置：路径、设备、日志、数据库、环境变量映射
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  data_uploads: data/uploads
+  data_datasets: data/datasets
+  user_db: data/user_db
+  chroma: data/chroma
+  logs: logs
+  outputs: outputs
+  outputs_reports: outputs/reports
+  outputs_figures: outputs/figures
+  outputs_personality: outputs/personality
+  outputs_debug: outputs/debug
+  models: models
+
+# 计算设备：cuda / cpu / auto（auto 表示有 GPU 则用 cuda）
+device: auto
+
+logging:
+  level: INFO          # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  file: logs/pipeline.log
+  max_bytes: 10485760  # 10 MB
+  backup_count: 5
+  format: "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+  json_enabled: false  # true 时输出 JSON 结构化日志
+
+database:
+  # SQLite 相对路径；也可通过环境变量 DB_PATH 覆盖
+  path: data/user_db/sqlite.db
+  url: sqlite:///data/user_db/sqlite.db
+
+# 环境变量名映射（敏感信息不写死在 YAML 中）
+env:
+  log_level: LOG_LEVEL
+  db_path: DB_PATH
+  device: DEVICE
+  emotion_root: EMOTION_ROOT
+  openai_api_key: OPENAI_API_KEY
+  deepseek_api_key: DEEPSEEK_API_KEY
