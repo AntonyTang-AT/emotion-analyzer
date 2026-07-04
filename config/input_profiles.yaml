@@ -1,0 +1,78 @@
+# 输入源 Profile：按 input_type 决定 L1 模态与各层开关
+# 运行时由 stage_manager 读取，与 pipeline.yaml 全局默认合并
+# 详见 docs/guides/技术路线总指南v2.0.md「输入源与流水线 Profile」
+
+profiles:
+  video_default:
+    input_type: video
+    l1_extractors: [text, speech, macro, micro]
+    preserve_raw_visual: true
+    l3:
+      enabled: true
+      segmentation_mode: dynamic   # dynamic | single | utterance
+    l4:
+      enabled: true
+    l5:
+      use_l4_weights: true
+    l6:
+      enabled: true
+      min_fragments: 30
+
+  audio_default:
+    input_type: audio
+    l1_extractors: [text, speech]   # text 经 Whisper ASR
+    l3:
+      enabled: true
+      segmentation_mode: dynamic
+    l4:
+      enabled: true                 # text vs speech 矛盾
+    l5:
+      use_l4_weights: true
+    l6:
+      enabled: true
+      min_fragments: 5
+
+  text_descriptive:
+    input_type: text
+    text_subtype: descriptive       # 描述性文本（说明、新闻等）
+    l1_extractors: [text]
+    l3:
+      enabled: true
+      segmentation_mode: single     # 整段或按段落，不做 VA 动态切分
+    l4:
+      enabled: false                # 单模态，不做矛盾分析
+    l5:
+      use_l4_weights: false
+      prompt_profile: text_descriptive
+    l6:
+      enabled: false
+
+  text_dialogue:
+    input_type: text
+    text_subtype: dialogue          # 对话/聊天记录
+    l1_extractors: [text]
+    l3:
+      enabled: true
+      segmentation_mode: utterance  # 按句/轮次切分
+    l4:
+      enabled: false
+    l5:
+      use_l4_weights: false
+      prompt_profile: text_dialogue
+    l6:
+      enabled: false
+
+  image_default:
+    input_type: image
+    l1_extractors: [macro, micro]
+    preserve_raw_visual: true
+    l3:
+      enabled: true
+      segmentation_mode: single     # 单帧，不动态分段
+    l4:
+      enabled: false                # 可选后续开启 macro↔micro 简化矛盾
+    l5:
+      use_l4_weights: false
+      prompt_profile: image_single_frame
+    l6:
+      enabled: false
