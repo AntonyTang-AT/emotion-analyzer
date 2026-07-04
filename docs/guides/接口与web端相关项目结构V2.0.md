@@ -11,7 +11,6 @@
 - API 返回结果中包含每个片段的**两分支VA**（`va_self` 和 `va_inter`）和 **L4输出的融合权重**（`suggested_fusion_weights`）
 - 前端新增**模态信任权重时序图**，展示矛盾场景下系统对不同模态的信任变化
 - 长效记忆存储两套 embedding（`va_self` 和 `va_inter`），支持按需检索
-- **多输入源**：`POST /upload` 支持 `input_type`（video/audio/text/image）及 `text_subtype`（descriptive/dialogue）；非视频源按 `input_profiles.yaml` 降级 L4/L6 等层级
 
 ## 二、目录结构（更新）
 
@@ -134,30 +133,16 @@ class SegmentResult(BaseModel):
 
 class AnalysisResponse(BaseModel):
     session_id: str
-    input_type: str                          # video | audio | text | image
-    text_subtype: Optional[str] = None       # descriptive | dialogue（仅 text）
-    active_modalities: List[str]             # 当前 Profile 激活的 L1 模态
     segments: List[SegmentResult]
     overall_report: str
     personality: Optional[Dict]
     raw_visual_summary: Optional[Dict]
-    l4_enabled: bool = True                  # 是否执行了矛盾分析
 ```
-
-**上传请求**（`multipart/form-data`）：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `input_type` | string | 必填，`video` / `audio` / `text` / `image` |
-| `file` | UploadFile | video/audio/image 时上传文件 |
-| `text_content` | string | text 时直接传文本（与 `file` 二选一） |
-| `text_subtype` | string | text 时可选，`descriptive` / `dialogue` |
-| `user_id` | string | 可选 |
 
 ### 3.3 server/api/v1/endpoints/analyze.py
 
-- `POST /upload`：接收 `input_type` 及对应文件或文本，调用 `core.run_pipeline(...)`，将完整结果存入 `Session.result_json`，返回 `session_id`。
-- `GET /result/{session_id}`：从数据库读取 `result_json`，按上述 Schema 返回（非视频源可能无 `personality`、无 L4 权重图数据）。
+- `POST /upload`：接收视频，调用 `core.run_pipeline`，将返回的完整结果（含权重）存入数据库的 `Session.result_json` 字段，返回 `session_id`。
+- `GET /result/{session_id}`：从数据库读取 `result_json`，按上述 Schema 返回。
 - `GET /report/{session_id}`：返回整体报告文本（从 result_json 中提取）。
 
 ### 3.4 server/api/v1/endpoints/memory.py（修改）
@@ -197,17 +182,7 @@ function drawWeightChart(segments) {
 
 ## 四、数据流说明（更新）
 
-### 1. 用户上传（多输入源）
-
-```
-Web → POST /upload（input_type + file|text_content）→ API 保存临时文件/文本
-  → core.run_pipeline(input_type=..., ...)  // 按 input_profiles 路由
-  → 返回结果（video/audio 含权重；text/image 可能跳过 L4/L6）
-  → 存储到数据库 → 返回 session_id
-Web → GET /result/{session_id} → 按 input_type 渲染对应图表（权重图仅 L4 启用时显示）
-```
-
-### 1a. 用户上传视频（等同 input_type=video）
+### 1. 用户上传视频
 
 ```
 Web → POST /upload → API 保存临时文件 → 调用 core.run_pipeline
@@ -261,5 +236,4 @@ Web → 实时绘制 VA_inter 曲线
 ---
 
 **文档版本**：V2.0（整合两分支VA、L4权重输出、纯视觉旁路）  
-**V2.1 补充**：多输入源 API 与前端上传扩展  
 **最后更新**：2026-06-05

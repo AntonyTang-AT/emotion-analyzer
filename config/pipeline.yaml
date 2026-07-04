@@ -1,6 +1,5 @@
 # 流水线各层开关与数据流控制
 # use_va_type / embedding_source：self（自建模分支）| inter（交互分支）
-# 非 video 输入源的 L1 模态与各层开关见 config/input_profiles.yaml
 
 pipeline:
   stages:
