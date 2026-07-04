@@ -15,11 +15,15 @@ CONFIG_NAMES: tuple[str, ...] = (
     "models",
     "pipeline",
     "weight_table",
+    "input_profiles",
 )
 
 VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 VALID_DEVICES = frozenset({"cuda", "cpu", "auto"})
 VALID_VA_TYPES = frozenset({"self", "inter"})
+VALID_INPUT_TYPES = frozenset({"video", "audio", "text", "image"})
+VALID_TEXT_SUBTYPES = frozenset({"descriptive", "dialogue"})
+VALID_SEGMENTATION_MODES = frozenset({"dynamic", "single", "utterance"})
 WEIGHT_TABLE_KEYS = frozenset({
     "masking",
     "sarcasm",
@@ -117,6 +121,8 @@ class ConfigManager:
             self._validate_pipeline(data)
         elif name == "weight_table":
             self._validate_weight_table(data)
+        elif name == "input_profiles":
+            self._validate_input_profiles(data)
 
     def _validate_global(self, data: dict[str, Any]) -> None:
         level = str(data.get("logging", {}).get("level", "INFO")).upper()
@@ -190,6 +196,41 @@ class ConfigManager:
             if abs(total - 1.0) > 0.01:
                 raise ValueError(
                     f"weight_table.{key} must sum to 1.0 (±0.01), got {total:.4f}"
+                )
+
+    def _validate_input_profiles(self, data: dict[str, Any]) -> None:
+        profiles = data.get("profiles")
+        if not isinstance(profiles, dict) or not profiles:
+            raise ValueError("input_profiles.profiles must be a non-empty mapping")
+
+        for name, profile in profiles.items():
+            if not isinstance(profile, dict):
+                raise ValueError(f"input_profiles.profiles.{name} must be a mapping")
+
+            input_type = profile.get("input_type")
+            if input_type not in VALID_INPUT_TYPES:
+                raise ValueError(
+                    f"Profile '{name}' has invalid input_type '{input_type}'"
+                )
+
+            extractors = profile.get("l1_extractors")
+            if not isinstance(extractors, list) or not extractors:
+                raise ValueError(
+                    f"Profile '{name}' must define non-empty l1_extractors"
+                )
+
+            l3 = profile.get("l3", {})
+            if isinstance(l3, dict):
+                mode = l3.get("segmentation_mode")
+                if mode is not None and mode not in VALID_SEGMENTATION_MODES:
+                    raise ValueError(
+                        f"Profile '{name}' has invalid segmentation_mode '{mode}'"
+                    )
+
+            text_subtype = profile.get("text_subtype")
+            if text_subtype is not None and text_subtype not in VALID_TEXT_SUBTYPES:
+                raise ValueError(
+                    f"Profile '{name}' has invalid text_subtype '{text_subtype}'"
                 )
 
 

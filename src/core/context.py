@@ -13,9 +13,11 @@ from .types import (
     ContradictionResult,
     FeatureDict,
     Fragment,
+    InputType,
     MemoryHit,
     PersonalityResult,
     ReportBundle,
+    TextSubtype,
     VAConfidence,
 )
 
@@ -112,12 +114,37 @@ class DataContext:
         cls,
         *,
         user_id: str,
-        video_path: str | Path,
+        input_type: str | InputType | None = None,
+        video_path: str | Path | None = None,
         audio_path: str | Path | None = None,
+        text_content: str | None = None,
+        text_path: str | Path | None = None,
+        image_path: str | Path | None = None,
+        text_subtype: str | TextSubtype | None = None,
         session_id: str | None = None,
         output_dir: str | Path | None = None,
         config_snapshot: dict[str, Any] | None = None,
+        profile_metadata: dict[str, Any] | None = None,
     ) -> DataContext:
+        resolved_type = cls._resolve_input_type(
+            input_type=input_type,
+            video_path=video_path,
+            audio_path=audio_path,
+            text_content=text_content,
+            text_path=text_path,
+            image_path=image_path,
+        )
+        if isinstance(resolved_type, InputType):
+            resolved_type = resolved_type.value
+
+        subtype_value: str | None = None
+        if text_subtype is not None:
+            subtype_value = (
+                text_subtype.value
+                if isinstance(text_subtype, TextSubtype)
+                else str(text_subtype).lower()
+            )
+
         session = session_id or str(uuid4())
         metadata: dict[str, Any] = {
             "session_id": session,
@@ -129,12 +156,81 @@ class DataContext:
             metadata["output_dir"] = str(output_dir)
         if config_snapshot is not None:
             metadata["config"] = config_snapshot
+        if profile_metadata:
+            metadata.update(profile_metadata)
 
-        raw_data = {"video_path": str(video_path)}
+        raw_data: dict[str, str] = {"input_type": resolved_type}
+        if subtype_value is not None:
+            raw_data["text_subtype"] = subtype_value
+        if video_path is not None:
+            raw_data["video_path"] = str(video_path)
         if audio_path is not None:
             raw_data["audio_path"] = str(audio_path)
+        if text_content is not None:
+            raw_data["text_content"] = text_content
+        if text_path is not None:
+            raw_data["text_path"] = str(text_path)
+        if image_path is not None:
+            raw_data["image_path"] = str(image_path)
 
         return cls(metadata=metadata, raw_data=raw_data)
+
+    @property
+    def input_type(self) -> str:
+        return str(self.raw_data.get("input_type", InputType.VIDEO.value))
+
+    @property
+    def text_subtype(self) -> str | None:
+        value = self.raw_data.get("text_subtype")
+        return str(value) if value is not None else None
+
+    @property
+    def active_modalities(self) -> list[str]:
+        modalities = self.metadata.get("active_modalities")
+        if isinstance(modalities, list):
+            return [str(m) for m in modalities]
+        return []
+
+    @staticmethod
+    def _resolve_input_type(
+        *,
+        input_type: str | InputType | None,
+        video_path: str | Path | None,
+        audio_path: str | Path | None,
+        text_content: str | None,
+        text_path: str | Path | None,
+        image_path: str | Path | None,
+    ) -> str:
+        if input_type is not None:
+            return (
+                input_type.value
+                if isinstance(input_type, InputType)
+                else str(input_type).lower()
+            )
+
+        provided = sum(
+            1
+            for value in (video_path, audio_path, text_content, text_path, image_path)
+            if value is not None
+        )
+        if provided == 0:
+            raise ValueError(
+                "Must specify input_type or at least one input path/content field"
+            )
+        if provided > 1 and video_path is None:
+            raise ValueError(
+                "Ambiguous input: specify input_type when multiple sources are given"
+            )
+
+        if video_path is not None:
+            return InputType.VIDEO.value
+        if audio_path is not None:
+            return InputType.AUDIO.value
+        if text_content is not None or text_path is not None:
+            return InputType.TEXT.value
+        if image_path is not None:
+            return InputType.IMAGE.value
+        raise ValueError("Unable to infer input_type from provided fields")
 
     def set_stage(self, stage_name: str, data: dict[str, Any]) -> None:
         if stage_name not in VALID_STAGES:
