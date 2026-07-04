@@ -17,6 +17,24 @@ class Modality(str, Enum):
     MICRO = "micro"
 
 
+class InputType(str, Enum):
+    VIDEO = "video"
+    AUDIO = "audio"
+    TEXT = "text"
+    IMAGE = "image"
+
+
+class TextSubtype(str, Enum):
+    DESCRIPTIVE = "descriptive"
+    DIALOGUE = "dialogue"
+
+
+class SegmentationMode(str, Enum):
+    DYNAMIC = "dynamic"
+    SINGLE = "single"
+    UTTERANCE = "utterance"
+
+
 class ContradictionType(str, Enum):
     MASKING = "masking"
     SARCASM = "sarcasm"

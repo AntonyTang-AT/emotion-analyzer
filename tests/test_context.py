@@ -12,6 +12,7 @@ def test_create_sets_metadata(sample_data_context):
     ctx = sample_data_context
     assert ctx.metadata["user_id"] == "test-user"
     assert ctx.metadata["session_id"]
+    assert ctx.raw_data["input_type"] == "video"
     assert set(ctx.metadata["stage_status"]) == set(VALID_STAGES)
     assert ctx.metadata["stage_status"]["L2"] == "completed"
     assert ctx.metadata["stage_status"]["L1"] == "pending"

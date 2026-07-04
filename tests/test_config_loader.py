@@ -14,6 +14,7 @@ def test_load_all_configs(sample_config):
         "models",
         "pipeline",
         "weight_table",
+        "input_profiles",
     }
 
 
