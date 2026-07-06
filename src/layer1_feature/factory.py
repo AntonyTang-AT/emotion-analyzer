@@ -8,6 +8,8 @@ from src.core.context import DataContext
 from src.core.interfaces import FeatureExtractor
 from src.core.types import FeatureDict
 
+from .speech_extractor import SpeechExtractor
+
 
 class StubModalityExtractor(FeatureExtractor):
     """Return placeholder features for a single modality."""
@@ -35,16 +37,22 @@ class StubModalityExtractor(FeatureExtractor):
         return {}
 
 
-_EXTRACTOR_REGISTRY: dict[str, type[StubModalityExtractor]] = {
+_EXTRACTOR_REGISTRY: dict[str, type[FeatureExtractor]] = {
     "text": StubModalityExtractor,
-    "speech": StubModalityExtractor,
+    "speech": SpeechExtractor,
     "macro": StubModalityExtractor,
     "micro": StubModalityExtractor,
 }
 
 
 def register_extractor(name: str, extractor_cls: type[FeatureExtractor]) -> None:
-    _EXTRACTOR_REGISTRY[name] = extractor_cls  # type: ignore[assignment]
+    _EXTRACTOR_REGISTRY[name] = extractor_cls
+
+
+def _instantiate_extractor(name: str, extractor_cls: type[FeatureExtractor]) -> FeatureExtractor:
+    if extractor_cls is StubModalityExtractor:
+        return extractor_cls(name)
+    return extractor_cls()
 
 
 def get_extractors_for_context(context: DataContext) -> list[FeatureExtractor]:
@@ -57,7 +65,8 @@ def get_extractors_for_context(context: DataContext) -> list[FeatureExtractor]:
     for name in modalities:
         if name not in _EXTRACTOR_REGISTRY:
             raise ValueError(f"No extractor registered for modality '{name}'")
-        extractors.append(_EXTRACTOR_REGISTRY[name](name))
+        extractor_cls = _EXTRACTOR_REGISTRY[name]
+        extractors.append(_instantiate_extractor(name, extractor_cls))
     return extractors
 
 
