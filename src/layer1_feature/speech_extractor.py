@@ -22,6 +22,9 @@ logger = get_logger(__name__)
 
 PROSODY_DIM = 16  # f0(1) + energy(1) + zcr(1) + mfcc(13)
 
+# Shared Wav2Vec2 weights keyed by model name (avoid reload per pipeline run).
+_MODEL_CACHE: dict[str, tuple[Any, Any]] = {}
+
 
 class SpeechExtractor(FeatureExtractor):
     """Extract per-second speech vectors from audio or video input."""
@@ -39,24 +42,26 @@ class SpeechExtractor(FeatureExtractor):
         self._feature_dim = self._embedding_dim + (
             PROSODY_DIM if self._prosody_enabled else 0
         )
-        self._model: Any = None
-        self._processor: Any = None
 
     @property
     def feature_dim(self) -> int:
         return self._feature_dim
 
     def _get_model(self) -> tuple[Any, Any]:
-        if self._model is None or self._processor is None:
-            import torch
-            from transformers import Wav2Vec2Model, Wav2Vec2Processor
+        cached = _MODEL_CACHE.get(self._model_name)
+        if cached is not None:
+            return cached
 
-            self._processor = Wav2Vec2Processor.from_pretrained(self._model_name)
-            self._model = Wav2Vec2Model.from_pretrained(self._model_name)
-            self._model.eval()
-            if not torch.cuda.is_available():
-                self._model.to("cpu")
-        return self._model, self._processor
+        import torch
+        from transformers import Wav2Vec2Model, Wav2Vec2Processor
+
+        processor = Wav2Vec2Processor.from_pretrained(self._model_name)
+        model = Wav2Vec2Model.from_pretrained(self._model_name)
+        model.eval()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.to(device)
+        _MODEL_CACHE[self._model_name] = (model, processor)
+        return model, processor
 
     def _resolve_waveform(self, context: DataContext) -> tuple[np.ndarray, int]:
         audio_path = context.raw_data.get("audio_path")

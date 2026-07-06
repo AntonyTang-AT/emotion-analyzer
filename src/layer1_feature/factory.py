@@ -71,7 +71,7 @@ def get_extractors_for_context(context: DataContext) -> list[FeatureExtractor]:
 
 
 def run_l1(context: DataContext) -> DataContext:
-    """Run all active stub extractors and merge features into context."""
+    """Run all active L1 extractors and merge features into context."""
     features: FeatureDict = dict(context.features)
     raw_visual = dict(context.raw_visual_features)
 
