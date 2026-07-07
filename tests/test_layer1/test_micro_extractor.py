@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import cv2
 import numpy as np
 import pytest
@@ -13,6 +15,15 @@ from src.layer1_feature.factory import run_l1
 from src.layer1_feature.gcn import MultiViewMicroProjector
 from src.layer1_feature.micro_extractor import MicroExpressionExtractor
 from src.pipeline import run_pipeline
+
+
+@pytest.fixture
+def sample_image_path(tmp_path: Path) -> Path:
+    path = tmp_path / "face.png"
+    image = np.zeros((48, 64, 3), dtype=np.uint8)
+    image[:, :, 1] = 180
+    assert cv2.imwrite(str(path), image)
+    return path
 
 
 def _micro_config() -> dict:
