@@ -8,6 +8,7 @@ from src.core.context import DataContext
 from src.core.interfaces import FeatureExtractor
 from src.core.types import FeatureDict
 
+from .micro_extractor import MicroExpressionExtractor
 from .speech_extractor import SpeechExtractor
 
 
@@ -41,7 +42,7 @@ _EXTRACTOR_REGISTRY: dict[str, type[FeatureExtractor]] = {
     "text": StubModalityExtractor,
     "speech": SpeechExtractor,
     "macro": StubModalityExtractor,
-    "micro": StubModalityExtractor,
+    "micro": MicroExpressionExtractor,
 }
 
 

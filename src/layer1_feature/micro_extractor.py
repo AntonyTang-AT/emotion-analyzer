@@ -1,0 +1,209 @@
+"""L1 micro-expression extraction using optical-flow displacement features.
+
+The production FRL-DGT path calls for a trained DGM and landmark GCN. For the
+initial project stage we implement the documented lightweight substitute:
+TV-L1 optical flow when OpenCV exposes it, with Farneback as a deterministic
+fallback. The extractor keeps the public schema stable while avoiding model
+downloads during tests and local development.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import cv2
+import numpy as np
+
+from src.core.context import DataContext
+from src.core.interfaces import FeatureExtractor
+from src.core.types import FeatureDict
+from src.layer1_feature.dgm import DisplacementFieldGenerator
+from src.layer1_feature.gcn import MultiViewMicroProjector
+from src.utils.config_loader import load_config
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class MicroExpressionEvent:
+    """A lightweight onset-apex event candidate."""
+
+    onset_index: int
+    apex_index: int
+    start_time: float
+    end_time: float
+    onset_frame: np.ndarray
+    apex_frame: np.ndarray
+
+
+class MicroExpressionExtractor(FeatureExtractor):
+    """Extract 256-dim micro-expression vectors from video or image inputs."""
+
+    modality = "micro"
+
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
+        micro_cfg = (config or load_config("features"))["micro"]
+        self.input_size = int(micro_cfg.get("input_size", 112))
+        self.embedding_dim = int(micro_cfg.get("embedding_dim", 256))
+        if self.embedding_dim != 256:
+            raise ValueError("MicroExpressionExtractor currently requires 256 dims")
+
+        amplify_cfg = micro_cfg.get("weak_signal_amplify", {})
+        self.amplify_enabled = bool(amplify_cfg.get("enabled", True))
+        self.amplify_coeff = float(amplify_cfg.get("au_coefficients", 2.5))
+        self.preserve_raw_visual = bool(micro_cfg.get("preserve_raw_visual", True))
+
+        self.displacement = DisplacementFieldGenerator(size=self.input_size)
+        self.projector = MultiViewMicroProjector(
+            content_dim=128,
+            relation_dim=128,
+        )
+        self._raw_visual: list[np.ndarray] = []
+
+    def extract(self, context: DataContext) -> FeatureDict:
+        events, fps = self._resolve_events(context)
+        results: list[dict[str, Any]] = []
+        raw_visual: list[np.ndarray] = []
+
+        for event in events:
+            flow = self.displacement.compute(event.onset_frame, event.apex_frame)
+            if self.amplify_enabled:
+                flow = self._amplify_weak_signal(flow)
+
+            feature = self.projector.project(flow).astype(np.float32)
+            if feature.shape != (self.embedding_dim,):
+                raise ValueError(
+                    f"Expected micro feature dim {self.embedding_dim}, "
+                    f"got {feature.shape}"
+                )
+
+            raw_visual.append(feature.copy())
+            results.append(
+                {
+                    "micro_feature": feature,
+                    "start_time": float(event.start_time),
+                    "end_time": float(event.end_time),
+                    "onset_frame": int(event.onset_index),
+                    "apex_frame": int(event.apex_index),
+                    "fps": float(fps),
+                }
+            )
+
+        self._raw_visual = raw_visual
+        return {self.modality: results}
+
+    def extract_raw_visual(self, context: DataContext) -> dict[str, Any]:
+        if not self.preserve_raw_visual:
+            return {}
+        return {self.modality: [item.copy() for item in self._raw_visual]}
+
+    def _resolve_events(self, context: DataContext) -> tuple[list[MicroExpressionEvent], float]:
+        if context.input_type == "image" or context.raw_data.get("image_path"):
+            image_path = context.raw_data.get("image_path")
+            if not image_path:
+                raise ValueError("MicroExpressionExtractor requires image_path")
+            frame = self._read_image(image_path)
+            return [
+                MicroExpressionEvent(
+                    onset_index=0,
+                    apex_index=0,
+                    start_time=0.0,
+                    end_time=0.0,
+                    onset_frame=frame,
+                    apex_frame=frame,
+                )
+            ], 1.0
+
+        video_path = context.raw_data.get("video_path")
+        if not video_path:
+            raise ValueError(
+                "MicroExpressionExtractor requires video_path or image_path"
+            )
+        frames, fps = self._read_video_frames(video_path)
+        return self._detect_events(frames, fps), fps
+
+    def _read_image(self, image_path: str | Path) -> np.ndarray:
+        image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise ValueError(f"Unable to read image: {image_path}")
+        return self._normalize_frame(image)
+
+    def _read_video_frames(self, video_path: str | Path) -> tuple[list[np.ndarray], float]:
+        capture = cv2.VideoCapture(str(video_path))
+        if not capture.isOpened():
+            raise ValueError(f"Unable to open video: {video_path}")
+
+        fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0) or 30.0
+        frames: list[np.ndarray] = []
+        try:
+            while True:
+                ok, frame = capture.read()
+                if not ok:
+                    break
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frames.append(self._normalize_frame(gray))
+        finally:
+            capture.release()
+
+        if not frames:
+            raise ValueError(f"No frames found in video: {video_path}")
+        return frames, fps
+
+    def _normalize_frame(self, frame: np.ndarray) -> np.ndarray:
+        resized = cv2.resize(
+            frame,
+            (self.input_size, self.input_size),
+            interpolation=cv2.INTER_AREA,
+        )
+        return resized.astype(np.float32) / 255.0
+
+    def _detect_events(
+        self,
+        frames: list[np.ndarray],
+        fps: float,
+    ) -> list[MicroExpressionEvent]:
+        if len(frames) == 1:
+            return [
+                MicroExpressionEvent(0, 0, 0.0, 0.0, frames[0], frames[0])
+            ]
+
+        scores = np.array(
+            [
+                float(np.mean(np.abs(frames[i + 1] - frames[i])))
+                for i in range(len(frames) - 1)
+            ],
+            dtype=np.float32,
+        )
+        apex_delta_index = int(np.argmax(scores))
+        onset_index = max(0, apex_delta_index - 1)
+        apex_index = min(len(frames) - 1, apex_delta_index + 1)
+
+        # A short initial-stage detector: choose the strongest motion interval.
+        # Longer videos can still produce one representative event for L2/L3.
+        return [
+            MicroExpressionEvent(
+                onset_index=onset_index,
+                apex_index=apex_index,
+                start_time=onset_index / fps,
+                end_time=apex_index / fps,
+                onset_frame=frames[onset_index],
+                apex_frame=frames[apex_index],
+            )
+        ]
+
+    def _amplify_weak_signal(self, flow: np.ndarray) -> np.ndarray:
+        amplified = flow.copy()
+        height, width, _ = amplified.shape
+
+        # Approximate key-AU regions without OpenFace/MediaPipe AU scores:
+        # mouth corners/lower face (AU12/AU15) and brow band get higher gain.
+        regions = [
+            (int(height * 0.55), int(height * 0.85), int(width * 0.20), int(width * 0.80)),
+            (int(height * 0.20), int(height * 0.42), int(width * 0.18), int(width * 0.82)),
+        ]
+        for y0, y1, x0, x1 in regions:
+            amplified[y0:y1, x0:x1, :] *= self.amplify_coeff
+        return amplified.astype(np.float32)
