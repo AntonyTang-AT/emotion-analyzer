@@ -82,6 +82,21 @@ def test_run_preserves_features_and_populates_visual_bypass(sample_video_path):
     assert context.raw_visual_features["macro"] is context.features["macro"]
 
 
+def test_extract_returns_only_macro_modality(sample_video_path):
+    context = DataContext.create(user_id="test", video_path=sample_video_path)
+    context.features["text"] = ["kept"]
+    extractor = MacroExtractor(
+        macro_config(),
+        aligner=lambda frame: frame,
+        encoder=lambda clip: np.arange(512, dtype=np.float32),
+    )
+
+    result = extractor.extract(context)
+
+    assert set(result.keys()) == {"macro"}
+    assert len(result["macro"]) == 2
+
+
 @pytest.mark.parametrize(
     "override",
     [{"roi_size": 0}, {"clip_frames": 0}, {"clip_stride": 0}, {"embedding_dim": 0}],
@@ -141,11 +156,33 @@ def test_run_pipeline_profiles_produce_macro_features(
         "speech",
         lambda: factory.StubModalityExtractor("speech"),
     )
+    monkeypatch.setitem(
+        factory._EXTRACTOR_REGISTRY,
+        "text",
+        lambda: factory.StubModalityExtractor("text"),
+    )
+    monkeypatch.setitem(
+        factory._EXTRACTOR_REGISTRY,
+        "micro",
+        lambda: factory.StubModalityExtractor("micro"),
+    )
     kwargs = (
         {"video_path": sample_video_path}
         if input_type == "video"
         else {"image_path": sample_image_path}
     )
 
-    result = run_pipeline(input_type, user_id="test", **kwargs)
+    result = run_pipeline(input_type, user_id="test", execute=True, **kwargs)
 
+    assert result["stage_status"]["L1"] == "completed"
+    macro_features = result["features"]["macro"]
+    assert len(macro_features) >= 1
+    feature, timestamp = macro_features[0]
+    assert feature.shape == (512,)
+    assert feature.dtype == np.float32
+    if input_type == "video":
+        assert len(macro_features) == 2
+        assert [item[1] for item in macro_features] == [0.0, 1.0]
+    else:
+        assert len(macro_features) == 1
+        assert timestamp == 0.0

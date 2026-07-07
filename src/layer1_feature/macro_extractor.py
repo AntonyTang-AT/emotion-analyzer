@@ -20,6 +20,9 @@ FeatureList = list[tuple[np.ndarray, float]]
 FrameAligner = Callable[[np.ndarray], np.ndarray]
 ClipEncoder = Callable[[Sequence[np.ndarray]], np.ndarray]
 
+# Shared VideoMAE weights keyed by model name (avoid reload per pipeline run).
+_VIDEOMAE_CACHE: dict[str, tuple[Any, Any]] = {}
+
 
 class MediaPipeFaceAligner:
     """Align one RGB face from its 468 MediaPipe landmarks."""
@@ -117,7 +120,7 @@ class MacroExtractor(FeatureExtractor):
         else:
             raise ValueError("MacroExtractor supports only video and image input profiles")
         self._last_features = features
-        return {**context.features, self.modality: features}
+        return {self.modality: features}
 
     def extract_raw_visual(self, context: DataContext) -> dict[str, Any]:
         return {self.modality: self._last_features}
@@ -183,13 +186,21 @@ class MacroExtractor(FeatureExtractor):
     def _encode_videomae(self, clip: Sequence[np.ndarray]) -> np.ndarray:
         import torch
         from transformers import VideoMAEImageProcessor, VideoMAEModel
-        model_name = str(self.config.get(
-            "videomae_model", "MCG-NJU/videomae-base-finetuned-kinetics"
-        ))
-        if self._processor is None:
-            self._processor = VideoMAEImageProcessor.from_pretrained(model_name)
-        if self._model is None:
-            self._model = VideoMAEModel.from_pretrained(model_name).eval()
+
+        model_name = str(
+            self.config.get(
+                "videomae_model", "MCG-NJU/videomae-base-finetuned-kinetics"
+            )
+        )
+        if self._processor is None or self._model is None:
+            cached = _VIDEOMAE_CACHE.get(model_name)
+            if cached is not None:
+                self._processor, self._model = cached
+            else:
+                processor = VideoMAEImageProcessor.from_pretrained(model_name)
+                model = VideoMAEModel.from_pretrained(model_name).eval()
+                _VIDEOMAE_CACHE[model_name] = (processor, model)
+                self._processor, self._model = processor, model
         device = str(self.config.get("device", "auto"))
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
