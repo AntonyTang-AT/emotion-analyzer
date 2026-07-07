@@ -136,6 +136,11 @@ def test_run_pipeline_profiles_produce_macro_features(
         encoder=lambda clip: np.arange(512, dtype=np.float32),
     )
     monkeypatch.setitem(factory._EXTRACTOR_REGISTRY, "macro", lambda: extractor)
+    monkeypatch.setitem(
+        factory._EXTRACTOR_REGISTRY,
+        "speech",
+        lambda: factory.StubModalityExtractor("speech"),
+    )
     kwargs = (
         {"video_path": sample_video_path}
         if input_type == "video"

@@ -9,6 +9,8 @@ from src.core.interfaces import FeatureExtractor
 from src.core.types import FeatureDict
 
 from .macro_extractor import MacroExtractor
+from .speech_extractor import SpeechExtractor
+
 
 class StubModalityExtractor(FeatureExtractor):
     """Return placeholder features for a single modality."""
@@ -40,7 +42,7 @@ ExtractorFactory = Callable[[], FeatureExtractor]
 
 _EXTRACTOR_REGISTRY: dict[str, ExtractorFactory] = {
     "text": lambda: StubModalityExtractor("text"),
-    "speech": lambda: StubModalityExtractor("speech"),
+    "speech": SpeechExtractor,
     "macro": MacroExtractor,
     "micro": lambda: StubModalityExtractor("micro"),
 }
@@ -66,7 +68,7 @@ def get_extractors_for_context(context: DataContext) -> list[FeatureExtractor]:
 
 
 def run_l1(context: DataContext) -> DataContext:
-    """Run all active stub extractors and merge features into context."""
+    """Run all active L1 extractors and merge features into context."""
     features: FeatureDict = dict(context.features)
     raw_visual = dict(context.raw_visual_features)
 

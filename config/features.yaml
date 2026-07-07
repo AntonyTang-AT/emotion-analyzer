@@ -9,7 +9,7 @@ text:
 
 speech:
   enabled: true
-  wav2vec2_model: facebook/wav2vec2-base
+  wav2vec2_model: facebook/wav2vec2-large-960h
   sample_rate: 16000
   embedding_dim: 1024
   fox:

@@ -16,7 +16,7 @@ layer2:
       text:
         input_dim: 768
       speech:
-        input_dim: 1024
+        input_dim: 1040
       macro:
         input_dim: 512
       micro:

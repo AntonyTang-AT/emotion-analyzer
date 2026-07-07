@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import numpy as np
 import pytest
 
 from src.core import DataContext, InputType, TextSubtype
+from src.layer1_feature.speech_extractor import SpeechExtractor
 from src.pipeline import run_pipeline
 from src.pipeline.input_profile import resolve_input_profile, resolve_profile_name
 from src.pipeline.io_handler import InputValidationError, load_input
@@ -112,16 +116,21 @@ def test_run_pipeline_text_stub():
     assert result["pipeline_complete"] is True
 
 
-def test_run_pipeline_video_stub(sample_video_path):
+@patch.object(SpeechExtractor, "_wav2vec_frames")
+def test_run_pipeline_video_stub(mock_wav2vec, sample_video_path, sample_wav_path):
+    mock_wav2vec.return_value = np.ones((49, 1024), dtype=np.float32)
     result = run_pipeline(
         "video",
         user_id="test",
         video_path=sample_video_path,
+        audio_path=sample_wav_path,
         execute=True,
     )
     assert result["l4_enabled"] is True
     assert result["stage_status"]["L1"] == "completed"
     assert len(result["features"]) == 4
+    assert "stub" not in result["features"]["speech"][0]
+    assert result["features"]["speech"][0]["speech_feature"].shape == (1040,)
 
 
 def test_config_loader_includes_input_profiles(sample_config):
