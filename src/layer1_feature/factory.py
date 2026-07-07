@@ -9,6 +9,7 @@ from src.core.interfaces import FeatureExtractor
 from src.core.types import FeatureDict
 
 from .macro_extractor import MacroExtractor
+from .micro_extractor import MicroExpressionExtractor
 from .speech_extractor import SpeechExtractor
 
 
@@ -44,7 +45,7 @@ _EXTRACTOR_REGISTRY: dict[str, ExtractorFactory] = {
     "text": lambda: StubModalityExtractor("text"),
     "speech": SpeechExtractor,
     "macro": MacroExtractor,
-    "micro": lambda: StubModalityExtractor("micro"),
+    "micro": MicroExpressionExtractor,
 }
 
 
