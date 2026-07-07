@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from src.core.context import DataContext
 from src.core.interfaces import FeatureExtractor
 from src.core.types import FeatureDict
 
+from .macro_extractor import MacroExtractor
 from .speech_extractor import SpeechExtractor
 
 
@@ -37,22 +38,19 @@ class StubModalityExtractor(FeatureExtractor):
         return {}
 
 
-_EXTRACTOR_REGISTRY: dict[str, type[FeatureExtractor]] = {
-    "text": StubModalityExtractor,
+ExtractorFactory = Callable[[], FeatureExtractor]
+
+_EXTRACTOR_REGISTRY: dict[str, ExtractorFactory] = {
+    "text": lambda: StubModalityExtractor("text"),
     "speech": SpeechExtractor,
-    "macro": StubModalityExtractor,
-    "micro": StubModalityExtractor,
+    "macro": MacroExtractor,
+    "micro": lambda: StubModalityExtractor("micro"),
 }
 
 
 def register_extractor(name: str, extractor_cls: type[FeatureExtractor]) -> None:
+    """Register an extractor class that supports no-argument construction."""
     _EXTRACTOR_REGISTRY[name] = extractor_cls
-
-
-def _instantiate_extractor(name: str, extractor_cls: type[FeatureExtractor]) -> FeatureExtractor:
-    if extractor_cls is StubModalityExtractor:
-        return extractor_cls(name)
-    return extractor_cls()
 
 
 def get_extractors_for_context(context: DataContext) -> list[FeatureExtractor]:
@@ -65,8 +63,7 @@ def get_extractors_for_context(context: DataContext) -> list[FeatureExtractor]:
     for name in modalities:
         if name not in _EXTRACTOR_REGISTRY:
             raise ValueError(f"No extractor registered for modality '{name}'")
-        extractor_cls = _EXTRACTOR_REGISTRY[name]
-        extractors.append(_instantiate_extractor(name, extractor_cls))
+        extractors.append(_EXTRACTOR_REGISTRY[name]())
     return extractors
 
 

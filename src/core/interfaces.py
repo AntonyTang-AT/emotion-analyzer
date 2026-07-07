@@ -29,7 +29,7 @@ class FeatureExtractor(LayerModule):
         return {}
 
     def run(self, context: DataContext) -> DataContext:
-        features = self.extract(context)
+        features = {**context.features, **self.extract(context)}
         raw_visual = {
             **context.raw_visual_features,
             **self.extract_raw_visual(context),

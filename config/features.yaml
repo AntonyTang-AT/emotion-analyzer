@@ -22,11 +22,16 @@ speech:
 macro:
   enabled: true
   mediapipe_model: face_landmarker
-  videomae_model: MCG-NJU/videomae-small
+  videomae_model: MCG-NJU/videomae-base-finetuned-kinetics
   face_landmarks: 468
+  face_margin: 0.2
   roi_size: 224
   clip_frames: 16
   clip_stride: 8
+  backend: videomae
+  align_faces: true
+  fallback_to_simple: true
+  device: auto
   embedding_dim: 512
 
 micro:

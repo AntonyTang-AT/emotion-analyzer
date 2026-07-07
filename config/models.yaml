@@ -1,5 +1,11 @@
 # L2–L6 模型超参数
 
+layer1:
+  macro:
+    backend: videomae
+    videomae_model: MCG-NJU/videomae-base-finetuned-kinetics
+    embedding_dim: 512
+
 layer2:
   two_branch_mlp:
     shared_dim: 256
