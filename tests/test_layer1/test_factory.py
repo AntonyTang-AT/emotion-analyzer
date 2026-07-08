@@ -112,6 +112,44 @@ def test_run_l1_skips_failed_extractor(monkeypatch):
     assert "text" not in result.features
     assert "speech" in result.features
     assert result.features["speech"][0]["stub"] is True
+    assert result.metadata["l1_failures"] == ["text"]
+    assert result.metadata["l1_partial"] is True
+    assert result.metadata["stage_status"]["L1"] == "completed"
+
+
+def test_run_l1_marks_failed_when_all_extractors_fail(monkeypatch):
+    failing = StubModalityExtractor("text")
+
+    def _boom(_context):
+        raise RuntimeError("simulated extractor failure")
+
+    monkeypatch.setattr(failing, "extract", _boom)
+    monkeypatch.setitem(factory._EXTRACTOR_REGISTRY, "text", lambda: failing)
+
+    context = DataContext.create(
+        user_id="all-fail-test",
+        input_type="text",
+        text_content="hello",
+        profile_metadata={"active_modalities": ["text"]},
+    )
+    result = run_l1(context)
+
+    assert result.features == {}
+    assert result.metadata["l1_failures"] == ["text"]
+    assert result.metadata["stage_status"]["L1"] == "failed"
+    assert "L1" in result.metadata["errors"]
+
+
+def test_resolve_modalities_from_input_type_without_active_modalities():
+    context = DataContext.create(
+        user_id="resolve-test",
+        input_type="text",
+        text_content="hello",
+        text_subtype="descriptive",
+    )
+    extractors = get_extractors_from_config(context=context)
+    assert len(extractors) == 1
+    assert isinstance(extractors[0], TextExtractor)
 
 
 def test_run_l1_merges_raw_visual():

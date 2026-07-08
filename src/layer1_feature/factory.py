@@ -105,6 +105,20 @@ def _resolve_modalities(
         if metadata.get("active_modalities"):
             return list(metadata["active_modalities"])
 
+        if context.input_type:
+            from src.pipeline.input_profile import resolve_input_profile
+
+            try:
+                _, profile = resolve_input_profile(
+                    context.input_type,
+                    context.text_subtype,
+                )
+                extractors = profile.get("l1_extractors")
+                if isinstance(extractors, list) and extractors:
+                    return list(extractors)
+            except ValueError:
+                pass
+
     pipeline_cfg = config or load_config("pipeline")
     stages = pipeline_cfg.get("pipeline", {}).get("stages", {})
     l1_extractors = stages.get("L1", {}).get("feature_extractors", [])
@@ -138,6 +152,7 @@ def run_l1(context: DataContext) -> DataContext:
     """Run all active L1 extractors and merge features into context."""
     features: FeatureDict = dict(context.features)
     raw_visual = dict(context.raw_visual_features)
+    failed: list[str] = []
 
     for extractor in get_extractors_for_context(context):
         modality = _extractor_modality_name(extractor)
@@ -150,6 +165,19 @@ def run_l1(context: DataContext) -> DataContext:
                 "L1 extractor failed for modality '%s', skipping",
                 modality,
             )
+            failed.append(modality)
+
+    if failed:
+        context.metadata["l1_failures"] = failed
+
+    if failed and not features:
+        context.features = features
+        context.raw_visual_features = raw_visual
+        context.mark_stage_failed(
+            "L1",
+            f"all extractors failed: {', '.join(failed)}",
+        )
+        return context
 
     context.set_stage(
         "L1",
@@ -158,6 +186,8 @@ def run_l1(context: DataContext) -> DataContext:
             "raw_visual_features": raw_visual,
         },
     )
+    if failed:
+        context.metadata["l1_partial"] = True
     return context
 
 
