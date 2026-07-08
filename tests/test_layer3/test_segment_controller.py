@@ -138,6 +138,38 @@ def test_modality_distance_rule_respects_threshold():
     assert len(fragments) == 2
 
 
+def test_modality_distance_ignores_forward_filled_stale_values():
+    """Only compare modalities updated at the same timestamp."""
+    frames = build_timeline(
+        _context_with_series(
+            inter_series={
+                "text": [_va(0.0, 0.0), _va(1.0, 1.0)],
+                "speech": [_va(0.0, 0.0), _va(-1.0, -1.0)],
+            },
+            features={
+                "text": [
+                    {"text_embedding": [0.0], "start_time": 0.0, "end_time": 1.0},
+                    {"text_embedding": [0.0], "start_time": 2.0, "end_time": 3.0},
+                ],
+                "speech": [
+                    {"speech_feature": [0.0], "timestamp": 0.0},
+                    {"speech_feature": [0.0], "timestamp": 1.0},
+                ],
+            },
+        )
+    )
+    config = SegmentationConfig(
+        arousal_threshold=1.0,
+        polarity_flip=False,
+        modality_distance_threshold=0.6,
+    )
+
+    fragments = segment_dynamic(frames, config)
+
+    # speech updates at t=1 with stale forward-filled text -> no distance cut
+    assert len(fragments) == 1
+
+
 def test_max_fragment_length_forces_cut():
     series = [_va(0.0, 0.0) for _ in range(5)]
     features = [

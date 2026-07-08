@@ -61,6 +61,7 @@ class TimelineFrame:
     time: float
     va_inter: dict[str, VAConfidence] = field(default_factory=dict)
     va_self: dict[str, VAConfidence] = field(default_factory=dict)
+    fresh_modalities: set[str] = field(default_factory=set)
 
 
 def _sign(value: float) -> int:
@@ -131,6 +132,8 @@ def build_timeline(
             index = _index_at_or_before(times, time)
             if index is None:
                 continue
+            if abs(times[index] - time) <= 1e-9:
+                frame.fresh_modalities.add(modality)
             if branch == "inter":
                 frame.va_inter[modality] = series[index]
                 self_series = other_predictions.get(modality)
@@ -316,7 +319,6 @@ def _utterance_boundaries(modality: str, items: list[Any]) -> list[tuple[float, 
 
 def _should_cut(
     *,
-    previous: TimelineFrame,
     current: TimelineFrame,
     combined_previous: tuple[float, float],
     combined_current: tuple[float, float],
@@ -334,9 +336,15 @@ def _should_cut(
             return True
 
     if config.modality_distance_threshold is not None:
-        distance = max_modality_distance(current.va_inter)
-        if distance > config.modality_distance_threshold:
-            return True
+        fresh_values = {
+            modality: current.va_inter[modality]
+            for modality in current.fresh_modalities
+            if modality in current.va_inter
+        }
+        if len(fresh_values) >= 2:
+            distance = max_modality_distance(fresh_values)
+            if distance > config.modality_distance_threshold:
+                return True
     return False
 
 
@@ -349,18 +357,17 @@ def _apply_crm_refinement(
         return cut_indices
 
     refined: list[int] = []
+    segment_start = 0
     for cut in cut_indices:
         best_index = cut
         best_score = float("inf")
-        for candidate in range(max(1, cut - 2), min(len(frames) - 1, cut + 2) + 1):
-            start_time = frames[0].time
-            end_time = frames[candidate].time
-            duration = end_time - start_time
+        for candidate in range(max(segment_start + 1, cut - 2), min(len(frames) - 1, cut + 2) + 1):
+            duration = frames[candidate].time - frames[segment_start].time
             if duration < config.crm_min_window_sec:
                 continue
             if duration > config.crm_max_window_sec:
                 continue
-            window = frames[: candidate + 1]
+            window = frames[segment_start : candidate + 1]
             score = sum(max_modality_distance(frame.va_inter) for frame in window) / len(
                 window
             )
@@ -368,6 +375,7 @@ def _apply_crm_refinement(
                 best_score = score
                 best_index = candidate
         refined.append(best_index)
+        segment_start = best_index
     return sorted(set(refined))
 
 
@@ -389,7 +397,6 @@ def segment_dynamic(frames: list[TimelineFrame], config: SegmentationConfig) -> 
             continue
 
         if _should_cut(
-            previous=frames[index - 1],
             current=frames[index],
             combined_previous=combined_values[index - 1],
             combined_current=combined_values[index],
