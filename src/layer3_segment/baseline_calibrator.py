@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from src.core.types import MODALITIES, Fragment, ModalityVADict, VAConfidence
 from src.utils.config_loader import get_project_root, load_config
@@ -144,7 +145,9 @@ def load_population_baseline(path: Path | None = None) -> ModalityVADict:
 
 
 def _baseline_file_path(user_id: str, storage_dir: Path) -> Path:
-    safe_id = str(user_id).strip().replace("/", "_").replace("\\", "_")
+    safe_id = quote(str(user_id).strip(), safe="")
+    if not safe_id:
+        raise ValueError("user_id must not be empty")
     directory = _resolve_project_path(storage_dir)
     return directory / f"{safe_id}.json"
 
@@ -162,7 +165,8 @@ def load_baseline(
         return None
     with path.open(encoding="utf-8") as handle:
         payload = json.load(handle)
-    return _delta_from_json(payload.get("delta_va", payload))
+    delta = _delta_from_json(payload.get("delta_va", payload))
+    return delta or None
 
 
 def save_baseline(
@@ -227,8 +231,11 @@ def calibrate_from_responses(
     cfg = config or BaselineConfig.from_pipeline()
     population = population_avg or load_population_baseline(cfg.population_baseline_path)
     delta_va = compute_delta_va(user_avg, population)
-    save_baseline(user_id, delta_va, config=cfg)
-    logger.info("Saved baseline calibration for user '%s' (%d modalities)", user_id, len(delta_va))
+    if delta_va:
+        save_baseline(user_id, delta_va, config=cfg)
+        logger.info("Saved baseline calibration for user '%s' (%d modalities)", user_id, len(delta_va))
+    else:
+        logger.info("No overlapping modalities for user '%s'; baseline not saved", user_id)
     return delta_va
 
 

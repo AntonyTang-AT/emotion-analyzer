@@ -160,3 +160,21 @@ def test_apply_baseline_to_fragment(tmp_path: Path):
     assert calibrated.va_self["text"].arousal == pytest.approx(0.4)
     assert calibrated.va_self["text"].confidence == pytest.approx(0.88)
     assert fragment.va_self["text"].valence == pytest.approx(0.9)
+
+
+def test_baseline_user_id_paths_do_not_collide(tmp_path: Path):
+    storage = tmp_path / "delta_va"
+    save_baseline("a/b", {"text": (0.1, 0.0)}, storage_dir=storage)
+    save_baseline("a_b", {"text": (0.2, 0.0)}, storage_dir=storage)
+
+    assert load_baseline("a/b", storage_dir=storage) == {"text": (0.1, 0.0)}
+    assert load_baseline("a_b", storage_dir=storage) == {"text": (0.2, 0.0)}
+
+
+def test_load_baseline_empty_delta_returns_none(tmp_path: Path):
+    storage = tmp_path / "delta_va"
+    path = storage / "empty.json"
+    storage.mkdir(parents=True)
+    path.write_text(json.dumps({"delta_va": {}, "updated_at": "2026-01-01T00:00:00Z"}), encoding="utf-8")
+
+    assert load_baseline("empty", storage_dir=storage) is None
