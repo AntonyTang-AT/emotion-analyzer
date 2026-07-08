@@ -27,6 +27,16 @@ layer2:
         checkpoint: null
   multitask:
     learnable_loss_weights: true
+    self_loss_weight: 0.3
+    inter_loss_weight: 0.7
+  training:
+    epochs: 20
+    batch_size: 64
+    learning_rate: 0.001
+    val_split: 0.2
+    mock_samples: 512
+    checkpoint_dir: models/l2
+    seed: 42
 
 layer3:
   segment:
