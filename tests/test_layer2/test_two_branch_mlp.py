@@ -12,12 +12,7 @@ from src.core.interfaces import VAPredictor
 from src.core.types import MODALITIES, VAConfidence
 from src.layer2_predict import BasePredictor, TwoBranchMLP
 
-MODALITY_DIMS = {
-    "text": 768,
-    "speech": 1040,
-    "macro": 512,
-    "micro": 256,
-}
+from tests.test_layer2.conftest import MODALITY_DIMS
 
 
 @pytest.fixture(autouse=True)

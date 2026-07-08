@@ -12,41 +12,14 @@ from src.core.types import MODALITIES
 from src.layer2_predict import PredictorRegistry, TwoBranchMLP, get_predictor
 from src.layer2_predict.registry import default_registry, initialize_registry
 
-
-def _models_config(*, text_checkpoint: str | None = None) -> dict:
-    return {
-        "layer2": {
-            "two_branch_mlp": {
-                "shared_dim": 16,
-                "branch_hidden": 8,
-                "dropout": 0.0,
-                "modalities": {
-                    "text": {"input_dim": 768, "checkpoint": text_checkpoint},
-                    "speech": {"input_dim": 1040, "checkpoint": None},
-                    "macro": {"input_dim": 512, "checkpoint": None},
-                    "micro": {"input_dim": 256, "checkpoint": None},
-                },
-            }
-        }
-    }
-
-
-def _pipeline_config(enabled: bool = True) -> dict:
-    return {"pipeline": {"stages": {"L2": {"enabled": enabled}}}}
-
-
-@pytest.fixture(autouse=True)
-def _reset_default_registry():
-    default_registry.clear()
-    yield
-    default_registry.clear()
+from tests.test_layer2.conftest import MODALITY_DIMS, pipeline_config_l2, tiny_models_config
 
 
 def test_initialize_registry_registers_all_modalities():
     registry = initialize_registry(
         registry=PredictorRegistry(),
-        models_config=_models_config(),
-        pipeline_config=_pipeline_config(),
+        models_config=tiny_models_config(),
+        pipeline_config=pipeline_config_l2(),
     )
 
     assert registry.names() == MODALITIES
@@ -59,22 +32,20 @@ def test_initialize_registry_registers_all_modalities():
 def test_initialize_registry_uses_expected_input_dims():
     registry = initialize_registry(
         registry=PredictorRegistry(),
-        models_config=_models_config(),
-        pipeline_config=_pipeline_config(),
+        models_config=tiny_models_config(),
+        pipeline_config=pipeline_config_l2(),
     )
 
-    assert registry.get_predictor("text").input_dim == 768
-    assert registry.get_predictor("speech").input_dim == 1040
-    assert registry.get_predictor("macro").input_dim == 512
-    assert registry.get_predictor("micro").input_dim == 256
+    for modality in MODALITIES:
+        assert registry.get_predictor(modality).input_dim == MODALITY_DIMS[modality]
 
 
 def test_initialize_registry_respects_active_modalities():
     registry = initialize_registry(
         active_modalities=["text", "speech"],
         registry=PredictorRegistry(),
-        models_config=_models_config(),
-        pipeline_config=_pipeline_config(),
+        models_config=tiny_models_config(),
+        pipeline_config=pipeline_config_l2(),
     )
 
     assert registry.names() == ("text", "speech")
@@ -83,8 +54,8 @@ def test_initialize_registry_respects_active_modalities():
 def test_initialize_registry_skips_when_l2_disabled():
     registry = initialize_registry(
         registry=PredictorRegistry(),
-        models_config=_models_config(),
-        pipeline_config=_pipeline_config(enabled=False),
+        models_config=tiny_models_config(),
+        pipeline_config=pipeline_config_l2(enabled=False),
     )
 
     assert len(registry) == 0
@@ -111,8 +82,8 @@ def test_initialize_registry_rejects_unknown_modality():
         initialize_registry(
             active_modalities=["unknown"],
             registry=PredictorRegistry(),
-            models_config=_models_config(),
-            pipeline_config=_pipeline_config(),
+            models_config=tiny_models_config(),
+            pipeline_config=pipeline_config_l2(),
         )
 
 
@@ -134,8 +105,8 @@ def test_initialize_registry_loads_checkpoint(tmp_path: Path):
     registry = initialize_registry(
         active_modalities=["text"],
         registry=PredictorRegistry(),
-        models_config=_models_config(text_checkpoint=str(checkpoint_path)),
-        pipeline_config=_pipeline_config(),
+        models_config=tiny_models_config(text_checkpoint=str(checkpoint_path)),
+        pipeline_config=pipeline_config_l2(),
     )
 
     after = registry.get_predictor("text").predict_self(features)
@@ -148,8 +119,8 @@ def test_package_get_predictor_uses_default_registry():
     initialize_registry(
         active_modalities=["micro"],
         registry=default_registry,
-        models_config=_models_config(),
-        pipeline_config=_pipeline_config(),
+        models_config=tiny_models_config(),
+        pipeline_config=pipeline_config_l2(),
     )
 
-    assert get_predictor("micro").input_dim == 256
+    assert get_predictor("micro").input_dim == MODALITY_DIMS["micro"]
