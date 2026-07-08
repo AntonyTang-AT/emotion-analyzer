@@ -81,6 +81,7 @@ def test_extract_output_schema_mocked(mock_wav2vec, sample_wav_path):
         assert item["speech_feature"].dtype == np.float32
     assert speech_items[0]["timestamp"] == 0.0
     assert speech_items[1]["timestamp"] == 1.0
+    assert speech_items[1]["timestamp"] > speech_items[0]["timestamp"]
 
 
 @pytest.mark.slow
