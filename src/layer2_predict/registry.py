@@ -45,7 +45,13 @@ class PredictorRegistry:
         return tuple(self._predictors.items())
 
     def __contains__(self, modal_name: object) -> bool:
-        return isinstance(modal_name, str) and modal_name in self._predictors
+        if not isinstance(modal_name, str):
+            return False
+        try:
+            name = _normalize_modality(modal_name)
+        except ValueError:
+            return False
+        return name in self._predictors
 
     def __len__(self) -> int:
         return len(self._predictors)
