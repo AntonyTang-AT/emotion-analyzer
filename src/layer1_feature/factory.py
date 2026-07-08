@@ -1,4 +1,4 @@
-"""Stub L1 feature extractors for pipeline routing before full model integration."""
+"""L1 feature extractor registry and runner."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from src.core.types import FeatureDict
 from .macro_extractor import MacroExtractor
 from .micro_extractor import MicroExpressionExtractor
 from .speech_extractor import SpeechExtractor
+from .text_extractor import TextExtractor
 
 
 class StubModalityExtractor(FeatureExtractor):
@@ -42,7 +43,7 @@ class StubModalityExtractor(FeatureExtractor):
 ExtractorFactory = Callable[[], FeatureExtractor]
 
 _EXTRACTOR_REGISTRY: dict[str, ExtractorFactory] = {
-    "text": lambda: StubModalityExtractor("text"),
+    "text": TextExtractor,
     "speech": SpeechExtractor,
     "macro": MacroExtractor,
     "micro": MicroExpressionExtractor,

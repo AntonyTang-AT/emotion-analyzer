@@ -8,7 +8,9 @@ import numpy as np
 import pytest
 
 from src.core import DataContext, InputType, TextSubtype
+from src.layer1_feature import factory
 from src.layer1_feature.speech_extractor import SpeechExtractor
+from src.layer1_feature.text_extractor import TextExtractor
 from src.pipeline import run_pipeline
 from src.pipeline.input_profile import resolve_input_profile, resolve_profile_name
 from src.pipeline.io_handler import InputValidationError, load_input
@@ -101,7 +103,13 @@ def test_load_input_missing_video_raises():
         load_input("video", video_path="missing.mp4")
 
 
-def test_run_pipeline_text_stub():
+def test_run_pipeline_text_stub(monkeypatch):
+    extractor = TextExtractor()
+    monkeypatch.setattr(
+        extractor, "_embed_text", lambda text: np.ones(768, dtype=np.float32)
+    )
+    monkeypatch.setitem(factory._EXTRACTOR_REGISTRY, "text", lambda: extractor)
+
     result = run_pipeline(
         "text",
         user_id="test",
@@ -113,12 +121,33 @@ def test_run_pipeline_text_stub():
     assert result["stage_status"]["L1"] == "completed"
     assert result["stage_status"]["L4"] == "skipped"
     assert "text" in result["features"]
+    assert result["features"]["text"][0]["text_embedding"].shape == (768,)
+    assert "stub" not in result["features"]["text"][0]
     assert result["pipeline_complete"] is True
 
 
 @patch.object(SpeechExtractor, "_wav2vec_frames")
-def test_run_pipeline_video_stub(mock_wav2vec, sample_video_path, sample_wav_path):
+@patch.object(TextExtractor, "_transcribe_audio")
+@patch("src.layer1_feature.text_extractor.extract_audio_from_video")
+def test_run_pipeline_video_stub(
+    mock_extract_audio,
+    mock_transcribe,
+    mock_wav2vec,
+    sample_video_path,
+    sample_wav_path,
+    monkeypatch,
+):
     mock_wav2vec.return_value = np.ones((49, 1024), dtype=np.float32)
+    mock_extract_audio.return_value = np.zeros(16000, dtype=np.float32)
+    mock_transcribe.return_value = {
+        "segments": [{"text": "hello", "start": 0.0, "end": 1.0}]
+    }
+    extractor = TextExtractor()
+    monkeypatch.setattr(
+        extractor, "_embed_text", lambda text: np.ones(768, dtype=np.float32)
+    )
+    monkeypatch.setitem(factory._EXTRACTOR_REGISTRY, "text", lambda: extractor)
+
     result = run_pipeline(
         "video",
         user_id="test",
@@ -131,6 +160,7 @@ def test_run_pipeline_video_stub(mock_wav2vec, sample_video_path, sample_wav_pat
     assert len(result["features"]) == 4
     assert "stub" not in result["features"]["speech"][0]
     assert result["features"]["speech"][0]["speech_feature"].shape == (1040,)
+    assert result["features"]["text"][0]["text_embedding"].shape == (768,)
 
 
 def test_config_loader_includes_input_profiles(sample_config):

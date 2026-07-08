@@ -3,7 +3,7 @@
 text:
   enabled: true
   whisper_model: base          # base | small
-  bert_model: bert-base-uncased
+  bert_model: bert-base-uncased  # English; use bert-base-chinese for zh text
   embedding_dim: 768
   language: auto
 
