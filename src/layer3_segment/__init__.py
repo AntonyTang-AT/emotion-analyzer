@@ -1,5 +1,16 @@
 """L3 adaptive segmentation and personalization."""
 
+from src.layer3_segment.cold_start import (
+    ColdStartConfig,
+    ColdStartUserRecord,
+    apply_cold_start,
+    blend_delta_va,
+    cosine_similarity,
+    delta_vector_to_dict,
+    find_similar_users,
+    get_cold_start_delta,
+    load_user_library,
+)
 from src.layer3_segment.baseline_calibrator import (
     BaselineConfig,
     apply_baseline,
@@ -26,16 +37,25 @@ from src.layer3_segment.segment_controller import (
 
 __all__ = [
     "BaselineConfig",
+    "ColdStartConfig",
+    "ColdStartUserRecord",
     "DynamicSegmentController",
     "SegmentationConfig",
     "TimelineFrame",
     "apply_baseline",
     "apply_baseline_to_fragment",
+    "apply_cold_start",
+    "blend_delta_va",
     "build_timeline",
     "calibrate_from_responses",
     "compute_delta_va",
+    "cosine_similarity",
+    "delta_vector_to_dict",
+    "find_similar_users",
+    "get_cold_start_delta",
     "load_baseline",
     "load_population_baseline",
+    "load_user_library",
     "run_calibration_session",
     "save_baseline",
     "segment_dynamic",
