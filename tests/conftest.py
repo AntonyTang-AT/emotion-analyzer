@@ -64,8 +64,8 @@ def sample_data_context() -> DataContext:
     ctx.set_stage(
         "L2",
         {
-            "va_self_predictions": {"text": VAConfidence(0.1, 0.2, 0.9)},
-            "va_inter_predictions": {"text": VAConfidence(0.3, 0.4, 0.8)},
+            "va_self_predictions": {"text": [VAConfidence(0.1, 0.2, 0.9)]},
+            "va_inter_predictions": {"text": [VAConfidence(0.3, 0.4, 0.8)]},
         },
     )
     return ctx
@@ -95,8 +95,8 @@ def full_data_context(sample_contradiction) -> DataContext:
     ctx.set_stage(
         "L2",
         {
-            "va_self_predictions": {"text": VAConfidence(0.1, 0.2, 0.9)},
-            "va_inter_predictions": {"text": VAConfidence(0.3, 0.4, 0.8)},
+            "va_self_predictions": {"text": [VAConfidence(0.1, 0.2, 0.9)]},
+            "va_inter_predictions": {"text": [VAConfidence(0.3, 0.4, 0.8)]},
         },
     )
     fragment = Fragment(
