@@ -24,6 +24,8 @@ _BERT_CACHE: dict[str, tuple[Any, Any]] = {}
 class TextExtractor(FeatureExtractor):
     """Extract timestamped text embeddings from audio, video, or raw text."""
 
+    modality = "text"
+
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         features_cfg = config or load_config("features")
         text_cfg = features_cfg["text"]
@@ -199,7 +201,7 @@ class TextExtractor(FeatureExtractor):
         )
         device = next(model.parameters()).device
         inputs = {key: value.to(device) for key, value in inputs.items()}
-        with torch.no_grad():
+        with torch.inference_mode():
             output = model(**inputs)
         embedding = output.last_hidden_state[:, 0, :].squeeze(0)
         return embedding.detach().cpu().numpy().astype(np.float32)
