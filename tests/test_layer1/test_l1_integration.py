@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import cv2
 import numpy as np
-import pytest
 
 from src.layer1_feature import factory
 from src.layer1_feature.factory import run_l1
@@ -13,6 +13,7 @@ from tests.test_layer1.conftest import (
     FEATURE_KEYS,
     MODALITY_DIMS,
     context_for_profile,
+    mock_macro_extractor,
     mock_text_extractor,
 )
 
@@ -79,11 +80,18 @@ def test_run_l1_text_profile_only_text(monkeypatch, sample_config):
     assert result.metadata["stage_status"]["L1"] == "completed"
 
 
-def test_run_l1_image_profile_macro_micro_bypass(sample_config, tmp_path):
+def test_run_l1_image_profile_macro_micro_bypass(
+    monkeypatch, sample_config, tmp_path
+):
+    monkeypatch.setitem(
+        factory._EXTRACTOR_REGISTRY,
+        "macro",
+        lambda: mock_macro_extractor(),
+    )
+
     image_path = tmp_path / "face.png"
     image = np.zeros((48, 64, 3), dtype=np.uint8)
     image[:, :, 1] = 180
-    import cv2
 
     assert cv2.imwrite(str(image_path), image)
 
