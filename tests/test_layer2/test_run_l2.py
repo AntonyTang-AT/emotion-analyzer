@@ -183,6 +183,21 @@ def test_run_l2_all_fail_marks_failed():
     assert not result.va_self_predictions
 
 
+def test_run_l2_empty_active_modalities_marks_failed():
+    context = DataContext.create(
+        user_id="test-user",
+        input_type="text",
+        text_content="hello",
+        profile_metadata={"active_modalities": []},
+    )
+    context.set_stage("L1", {"features": {"text": _text_items(1)}, "raw_visual_features": {}})
+
+    result = run_l2(context)
+
+    assert result.metadata["stage_status"]["L2"] == "failed"
+    assert not result.va_self_predictions
+
+
 def test_run_l2_partial_metadata():
     context = _context_with_features(
         ["text", "micro"],
@@ -193,6 +208,25 @@ def test_run_l2_partial_metadata():
 
     assert result.metadata["l2_partial"] is True
     assert set(result.metadata["l2_failures"]) == {"micro"}
+
+
+def test_run_l2_normalizes_modality_names():
+    context = DataContext.create(
+        user_id="test-user",
+        input_type="video",
+        video_path="data/raw/test.mp4",
+        profile_metadata={"active_modalities": ["Text"]},
+    )
+    context.set_stage(
+        "L1",
+        {"features": {"text": _text_items(1)}, "raw_visual_features": {}},
+    )
+
+    result = run_l2(context)
+
+    assert result.metadata["stage_status"]["L2"] == "completed"
+    assert "text" in result.va_self_predictions
+    assert len(result.va_self_predictions["text"]) == 1
 
 
 def test_extract_feature_vectors_sorts_macro_by_timestamp():

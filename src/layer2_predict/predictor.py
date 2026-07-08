@@ -43,20 +43,46 @@ def _extract_feature_vectors(modality: str, items: list[Any]) -> list[np.ndarray
     return [np.asarray(item[feature_key], dtype=np.float32) for item in sorted_items]
 
 
+def _normalize_modality(modality: str) -> str:
+    name = str(modality).strip().lower()
+    if not name:
+        raise ValueError("modality name must not be empty")
+    return name
+
+
+def _active_modalities(context: DataContext) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for modality in context.active_modalities:
+        try:
+            name = _normalize_modality(modality)
+        except ValueError:
+            continue
+        if name not in seen:
+            seen.add(name)
+            ordered.append(name)
+    return ordered
+
+
 def run_l2(context: DataContext) -> DataContext:
     """Run L2 predictors for active modalities and store VA time series."""
+    modalities = _active_modalities(context)
     registry = initialize_registry(
-        active_modalities=context.active_modalities,
+        active_modalities=modalities,
         registry=PredictorRegistry(),
     )
     if len(registry) == 0:
+        context.mark_stage_failed(
+            "L2",
+            "no L2 predictors registered (L2 disabled or no active modalities)",
+        )
         return context
 
     va_self: dict[str, list[VAConfidence]] = {}
     va_inter: dict[str, list[VAConfidence]] = {}
     failed: list[str] = []
 
-    for modality in context.active_modalities:
+    for modality in modalities:
         items = context.features.get(modality)
         if not items:
             logger.warning("L2 skip '%s': no L1 features", modality)
