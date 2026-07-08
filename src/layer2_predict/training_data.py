@@ -11,6 +11,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from src.core.types import MODALITIES
+from src.utils.config_loader import get_config
 
 MODALITY_DIMS: dict[str, int] = {
     "text": 768,
@@ -89,6 +90,16 @@ class MockVATrainingDataset(Dataset):
         return feature, target_self, target_inter
 
 
+def _resolve_feature_path(path_str: str) -> Path:
+    path = Path(path_str)
+    if path.is_file():
+        return path
+    resolved = get_config().resolve_path(path_str)
+    if resolved.is_file():
+        return resolved
+    return path
+
+
 class ManifestVATrainingDataset(Dataset):
     """Load features and VA labels from a JSONL manifest."""
 
@@ -116,7 +127,7 @@ class ManifestVATrainingDataset(Dataset):
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         record = self.records[index]
-        feature_path = Path(record["feature_path"])
+        feature_path = _resolve_feature_path(str(record["feature_path"]))
         if not feature_path.is_file():
             raise FileNotFoundError(f"Feature file not found: {feature_path}")
         feature = torch.from_numpy(np.load(feature_path).astype(np.float32))

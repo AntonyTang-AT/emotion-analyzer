@@ -241,6 +241,11 @@ def train_modality(
             criterion.load_state_dict(payload["criterion"])
             start_epoch = int(payload.get("epoch", 0))
             best_mae_va = float(payload.get("metrics", {}).get("mae_va", best_mae_va))
+            if metrics_path.is_file():
+                existing = json.loads(metrics_path.read_text(encoding="utf-8"))
+                history = list(existing.get("history", []))
+                if np.isfinite(existing.get("best_mae_va", float("nan"))):
+                    best_mae_va = float(existing["best_mae_va"])
             logger.info("Resumed training from %s at epoch %s", resume_file, start_epoch)
 
     for epoch in range(start_epoch, resolved_epochs):
@@ -283,9 +288,17 @@ def train_modality(
         )
 
         mae_va = float(val_metrics.get("mae_va", float("inf")))
-        if mae_va < best_mae_va:
+        if np.isfinite(mae_va) and mae_va < best_mae_va:
             best_mae_va = mae_va
             torch.save(model.state_dict(), best_path)
+        elif not best_path.is_file():
+            torch.save(model.state_dict(), best_path)
+            if np.isfinite(mae_va):
+                best_mae_va = mae_va
+
+    if not best_path.is_file() and last_path.is_file():
+        payload = torch.load(last_path, map_location=torch_device, weights_only=False)
+        torch.save(payload["state_dict"], best_path)
 
     metrics_path.write_text(
         json.dumps({"history": history, "best_mae_va": best_mae_va}, indent=2),

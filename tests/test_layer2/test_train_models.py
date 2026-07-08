@@ -109,7 +109,9 @@ def test_train_modality_resume_continues(tmp_path: Path):
     )
 
     history = json.loads(second.metrics_path.read_text(encoding="utf-8"))["history"]
-    assert len(history) == 1
+    assert len(history) == 2
+    assert history[0]["epoch"] == 1
+    assert history[1]["epoch"] == 2
     assert second.best_checkpoint.is_file()
 
     second_payload = torch.load(second.last_checkpoint, map_location="cpu", weights_only=False)
