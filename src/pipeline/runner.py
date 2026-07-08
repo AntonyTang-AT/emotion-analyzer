@@ -6,6 +6,7 @@ from typing import Any
 
 from src.core.context import DataContext, VALID_STAGES
 from src.layer1_feature.factory import run_l1
+from src.layer2_predict.predictor import run_l2
 from src.pipeline.stage_manager import StageManager
 
 
@@ -25,6 +26,8 @@ class PipelineRunner:
         for stage in self.stage_manager.get_execution_order():
             if stage == "L1":
                 context = run_l1(context)
+            elif stage == "L2":
+                context = run_l2(context)
             else:
                 context.metadata.setdefault("stage_status", {})[stage] = "pending"
                 skipped[stage] = "not_implemented"

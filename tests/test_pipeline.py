@@ -40,6 +40,9 @@ def test_run_pipeline_text_minimal(monkeypatch):
     assert result["segmentation_mode"] == "utterance"
     assert result["features"]["text"][0]["text_embedding"].shape == (768,)
     assert "stub" not in result["features"]["text"][0]
+    assert result["stage_status"]["L2"] == "completed"
+    assert len(result["context"]["va_self_predictions"]["text"]) >= 1
+    assert len(result["context"]["va_inter_predictions"]["text"]) >= 1
 
 
 def test_run_pipeline_execute_false(sample_wav_path):

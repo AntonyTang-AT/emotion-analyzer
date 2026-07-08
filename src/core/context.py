@@ -15,6 +15,7 @@ from .types import (
     Fragment,
     InputType,
     MemoryHit,
+    ModalityVASeriesDict,
     PersonalityResult,
     ReportBundle,
     TextSubtype,
@@ -93,6 +94,25 @@ def _import_numpy() -> Any:
     return np
 
 
+def _encode_va_series(value: ModalityVASeriesDict) -> dict[str, list[dict[str, float]]]:
+    return {
+        modality: [item.to_dict() for item in predictions]
+        for modality, predictions in value.items()
+    }
+
+
+def _decode_va_series(data: dict[str, Any]) -> ModalityVASeriesDict:
+    result: ModalityVASeriesDict = {}
+    for modality, predictions in data.items():
+        if isinstance(predictions, list):
+            result[str(modality)] = [
+                VAConfidence.from_dict(item) for item in predictions
+            ]
+        else:
+            result[str(modality)] = [VAConfidence.from_dict(predictions)]
+    return result
+
+
 @dataclass
 class DataContext:
     """Unified state container passed through the L1-L6 pipeline."""
@@ -101,8 +121,8 @@ class DataContext:
     raw_data: dict[str, str] = field(default_factory=dict)
     features: FeatureDict = field(default_factory=dict)
     raw_visual_features: dict[str, Any] = field(default_factory=dict)
-    va_self_predictions: dict[str, VAConfidence] = field(default_factory=dict)
-    va_inter_predictions: dict[str, VAConfidence] = field(default_factory=dict)
+    va_self_predictions: ModalityVASeriesDict = field(default_factory=dict)
+    va_inter_predictions: ModalityVASeriesDict = field(default_factory=dict)
     segments: list[Fragment] = field(default_factory=list)
     memory_retrieved: list[MemoryHit] = field(default_factory=list)
     contradiction: ContradictionResult | None = None
@@ -256,10 +276,7 @@ class DataContext:
         for field_name in STAGE_FIELDS[stage_name]:
             value = getattr(self, field_name)
             if field_name in {"va_self_predictions", "va_inter_predictions"}:
-                result[field_name] = {
-                    k: v.to_dict() if isinstance(v, VAConfidence) else v
-                    for k, v in value.items()
-                }
+                result[field_name] = _encode_va_series(value)
             elif field_name == "segments":
                 result[field_name] = [f.to_dict() for f in value]
             elif field_name == "memory_retrieved":
@@ -286,12 +303,8 @@ class DataContext:
             "raw_data": dict(self.raw_data),
             "features": _encode_value(self.features),
             "raw_visual_features": _encode_value(self.raw_visual_features),
-            "va_self_predictions": {
-                k: v.to_dict() for k, v in self.va_self_predictions.items()
-            },
-            "va_inter_predictions": {
-                k: v.to_dict() for k, v in self.va_inter_predictions.items()
-            },
+            "va_self_predictions": _encode_va_series(self.va_self_predictions),
+            "va_inter_predictions": _encode_va_series(self.va_inter_predictions),
             "segments": [segment.to_dict() for segment in self.segments],
             "memory_retrieved": [hit.to_dict() for hit in self.memory_retrieved],
             "contradiction": (
@@ -308,14 +321,10 @@ class DataContext:
             raw_data=dict(data.get("raw_data", {})),
             features=_decode_value(data.get("features", {})),
             raw_visual_features=_decode_value(data.get("raw_visual_features", {})),
-            va_self_predictions={
-                k: VAConfidence.from_dict(v)
-                for k, v in data.get("va_self_predictions", {}).items()
-            },
-            va_inter_predictions={
-                k: VAConfidence.from_dict(v)
-                for k, v in data.get("va_inter_predictions", {}).items()
-            },
+            va_self_predictions=_decode_va_series(data.get("va_self_predictions", {})),
+            va_inter_predictions=_decode_va_series(
+                data.get("va_inter_predictions", {})
+            ),
             segments=[Fragment.from_dict(item) for item in data.get("segments", [])],
             memory_retrieved=[
                 MemoryHit.from_dict(item) for item in data.get("memory_retrieved", [])

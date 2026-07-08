@@ -27,8 +27,8 @@ def test_set_stage_updates_status(sample_data_context):
 
 def test_get_stage_l2_roundtrip(sample_data_context):
     stage = sample_data_context.get_stage("L2")
-    assert stage["va_self_predictions"]["text"]["valence"] == pytest.approx(0.1)
-    assert stage["va_inter_predictions"]["text"]["arousal"] == pytest.approx(0.4)
+    assert stage["va_self_predictions"]["text"][0]["valence"] == pytest.approx(0.1)
+    assert stage["va_inter_predictions"]["text"][0]["arousal"] == pytest.approx(0.4)
 
 
 def test_unknown_stage_raises(sample_data_context):

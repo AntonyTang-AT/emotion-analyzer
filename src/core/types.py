@@ -45,6 +45,7 @@ class ContradictionType(str, Enum):
 
 FeatureDict = dict[str, Any]
 ModalityVADict = dict[str, "VAConfidence"]
+ModalityVASeriesDict = dict[str, list["VAConfidence"]]
 
 
 @dataclass
