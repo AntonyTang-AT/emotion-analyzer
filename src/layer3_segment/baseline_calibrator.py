@@ -198,10 +198,12 @@ def apply_baseline(
 ) -> ModalityVADict:
     """Subtract stored delta VA from VA_self predictions."""
     cfg = config or BaselineConfig.from_pipeline()
-    if not cfg.enabled:
-        return {modality: VAConfidence(item.valence, item.arousal, item.confidence) for modality, item in va_self.items()}
-
-    resolved_delta = delta if delta is not None else load_baseline(user_id, config=cfg)
+    if delta is not None:
+        resolved_delta = delta
+    elif cfg.enabled:
+        resolved_delta = load_baseline(user_id, config=cfg)
+    else:
+        resolved_delta = None
     if not resolved_delta:
         return {modality: VAConfidence(item.valence, item.arousal, item.confidence) for modality, item in va_self.items()}
 

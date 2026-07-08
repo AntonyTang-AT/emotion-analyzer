@@ -89,6 +89,21 @@ def test_apply_baseline_no_baseline_returns_unchanged():
     assert result is not va_self
 
 
+def test_apply_baseline_explicit_delta_when_disabled():
+    va_self = {"text": _va(0.8, 0.6, 0.75)}
+    delta = {"text": (0.3, 0.2)}
+
+    result = apply_baseline(
+        va_self,
+        "user-1",
+        delta=delta,
+        config=BaselineConfig(enabled=False),
+    )
+
+    assert result["text"].valence == pytest.approx(0.5)
+    assert result["text"].arousal == pytest.approx(0.4)
+
+
 def test_save_load_roundtrip(tmp_path: Path):
     storage = tmp_path / "delta_va"
     delta = {"text": (0.1, -0.05), "macro": (0.2, 0.0)}
