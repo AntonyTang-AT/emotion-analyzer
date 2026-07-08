@@ -1,0 +1,8 @@
+{
+  "population_average": {
+    "text": {"valence": 0.20, "arousal": 0.10, "confidence": 0.90},
+    "speech": {"valence": 0.15, "arousal": 0.12, "confidence": 0.88},
+    "macro": {"valence": 0.18, "arousal": 0.08, "confidence": 0.85},
+    "micro": {"valence": 0.12, "arousal": 0.14, "confidence": 0.82}
+  }
+}
