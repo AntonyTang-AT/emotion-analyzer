@@ -15,12 +15,16 @@ layer2:
     modalities:
       text:
         input_dim: 768
+        checkpoint: null
       speech:
         input_dim: 1040
+        checkpoint: null
       macro:
         input_dim: 512
+        checkpoint: null
       micro:
         input_dim: 256
+        checkpoint: null
   multitask:
     learnable_loss_weights: true
 
