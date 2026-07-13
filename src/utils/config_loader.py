@@ -170,6 +170,12 @@ class ConfigManager:
         emb_type = memory.get("embedding_type")
         if emb_type is not None and emb_type not in VALID_VA_TYPES:
             raise ValueError("L3.memory.embedding_type must be 'self' or 'inter'")
+        decay_alpha = memory.get("decay_alpha")
+        if decay_alpha is not None and float(decay_alpha) < 0:
+            raise ValueError("L3.memory.decay_alpha must be non-negative")
+        memory_top_k = memory.get("top_k")
+        if memory_top_k is not None and int(memory_top_k) <= 0:
+            raise ValueError("L3.memory.top_k must be positive")
 
         l4 = stages.get("L4", {})
         strategy = l4.get("weight_strategy")
