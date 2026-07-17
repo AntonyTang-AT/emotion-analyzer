@@ -47,16 +47,23 @@ pipeline:
 
     L4:
       enabled: true
-      quadrant_thresholds: [0.50, 0.65, 0.70, 0.55]  # QBTD 四象限阈值
+      quadrant_thresholds: [0.50, 0.65, 0.70, 0.55]  # QBTD 四象限阈值（辅助）
       weight_strategy: rule_table    # rule_table | small_nn
       rule_table_path: config/weight_table.yaml
+      fusion_policy_path: config/fusion_policy.yaml
       routing_confidence_divisor: 1.2  # intensity / divisor 归一化上限
+      disagreement_score_divisor: 1.2  # max_distance 归一化上限
 
     L5:
       enabled: true
       mode: online                   # online | offline
-      llm_model: deepseek            # deepseek | openai | qwen
+      llm_backend: local             # local | openai | deepseek
+      llm_model: Qwen/Qwen2.5-7B-Instruct
+      llm_quantization: int4
+      llm_temperature: 0.3
+      llm_max_tokens: 256
       use_l4_weights: true
+      allow_rewrite_upstream: false  # 与 fusion_policy.llm 保持一致
       segment_report_max_chars: 80
       overall_report_max_chars: 300
 

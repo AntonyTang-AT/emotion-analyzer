@@ -1,0 +1,32 @@
+# L4 融合策略配置（MER2026 经验迁移冷启动默认值）
+# 注意：confidence_threshold / max_switch_rate / min_disagreement_score
+# 仅作初始默认，必须在 D9-min 上重新标定。
+
+ser:
+  enabled: true
+  router: rule_table          # rule_table | linear（后期）
+  confidence_threshold: 0.65  # 冷启动默认
+  max_switch_rate: 0.10       # 冷启动默认
+  default_strategy: weighted_fusion
+
+dtrb:
+  enabled: true
+  trigger:
+    min_va_distance: 0.6
+    min_disagreement_score: 0.35
+  max_va_adjustment: 0.15     # 连续 VA 修正上限（非 openset cap）
+  reason_guided: false        # 接入 AffectGPT 后再启用
+  swap_noise_first: true
+
+rrb:
+  enabled: false              # MVP 关闭；有 L2.A AffectGPT 后再启用
+  max_bridge: 1
+  require_evidence_in_reason: true
+
+llm:
+  allow_rewrite_upstream: false
+  backend: local              # local | openai | deepseek
+  model: Qwen/Qwen2.5-7B-Instruct
+  quantization: int4
+  temperature: 0.3
+  max_tokens: 256

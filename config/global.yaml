@@ -39,3 +39,4 @@ env:
   emotion_root: EMOTION_ROOT
   openai_api_key: OPENAI_API_KEY
   deepseek_api_key: DEEPSEEK_API_KEY
+  local_llm_path: LOCAL_LLM_PATH   # 可选：本地 Qwen 权重目录
