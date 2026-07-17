@@ -11,6 +11,7 @@ def test_load_all_configs(sample_config):
     assert set(sample_config) == {
         "global",
         "features",
+        "fusion_policy",
         "models",
         "pipeline",
         "weight_table",
@@ -22,6 +23,24 @@ def test_load_pipeline_threshold(sample_config):
     seg = sample_config["pipeline"]["pipeline"]["stages"]["L3"]["segmentation"]
     assert seg["arousal_threshold"] == 0.3
     assert seg["max_fragment_length"] == 30
+
+
+def test_pipeline_l4_l5_fusion_defaults(sample_config):
+    stages = sample_config["pipeline"]["pipeline"]["stages"]
+    l4 = stages["L4"]
+    l5 = stages["L5"]
+    assert l4["fusion_policy_path"] == "config/fusion_policy.yaml"
+    assert l4["disagreement_score_divisor"] == 1.2
+    assert l5["llm_backend"] == "local"
+    assert l5["llm_model"] == "Qwen/Qwen2.5-7B-Instruct"
+    assert l5["allow_rewrite_upstream"] is False
+
+
+def test_fusion_policy_defaults(sample_config):
+    policy = sample_config["fusion_policy"]
+    assert policy["ser"]["max_switch_rate"] == 0.10
+    assert policy["dtrb"]["reason_guided"] is False
+    assert policy["llm"]["allow_rewrite_upstream"] is False
 
 
 def test_weight_table_sums_to_one(sample_config):
