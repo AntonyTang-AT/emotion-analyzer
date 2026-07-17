@@ -8,3 +8,4 @@ mediapipe>=0.10
 torch>=2.0
 transformers>=4.36
 openai-whisper>=20231117
+chromadb>=0.5

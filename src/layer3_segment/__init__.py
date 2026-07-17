@@ -34,12 +34,15 @@ from src.layer3_segment.segment_controller import (
     segment_single,
     segment_utterance,
 )
+from src.layer3_segment.memory_store import MemoryConfig, MemoryStore
 
 __all__ = [
     "BaselineConfig",
     "ColdStartConfig",
     "ColdStartUserRecord",
     "DynamicSegmentController",
+    "MemoryConfig",
+    "MemoryStore",
     "SegmentationConfig",
     "TimelineFrame",
     "apply_baseline",
