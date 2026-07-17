@@ -12,6 +12,7 @@ import yaml
 CONFIG_NAMES: tuple[str, ...] = (
     "global",
     "features",
+    "fusion_policy",
     "models",
     "pipeline",
     "weight_table",
@@ -24,6 +25,8 @@ VALID_VA_TYPES = frozenset({"self", "inter"})
 VALID_INPUT_TYPES = frozenset({"video", "audio", "text", "image"})
 VALID_TEXT_SUBTYPES = frozenset({"descriptive", "dialogue"})
 VALID_SEGMENTATION_MODES = frozenset({"dynamic", "single", "utterance"})
+VALID_LLM_BACKENDS = frozenset({"local", "openai", "deepseek"})
+VALID_SER_ROUTERS = frozenset({"rule_table", "linear"})
 WEIGHT_TABLE_KEYS = frozenset({
     "masking",
     "sarcasm",
@@ -119,6 +122,8 @@ class ConfigManager:
             self._validate_global(data)
         elif name == "pipeline":
             self._validate_pipeline(data)
+        elif name == "fusion_policy":
+            self._validate_fusion_policy(data)
         elif name == "weight_table":
             self._validate_weight_table(data)
         elif name == "input_profiles":
@@ -181,6 +186,85 @@ class ConfigManager:
         strategy = l4.get("weight_strategy")
         if strategy is not None and strategy not in ("rule_table", "small_nn"):
             raise ValueError("L4.weight_strategy must be 'rule_table' or 'small_nn'")
+
+        disagreement_divisor = l4.get("disagreement_score_divisor")
+        if disagreement_divisor is not None and float(disagreement_divisor) <= 0:
+            raise ValueError("L4.disagreement_score_divisor must be positive")
+
+        fusion_policy_path = l4.get("fusion_policy_path")
+        if fusion_policy_path is not None:
+            resolved = self.resolve_path(str(fusion_policy_path))
+            if not resolved.is_file():
+                raise FileNotFoundError(
+                    f"L4.fusion_policy_path does not exist: {resolved}"
+                )
+
+        l5 = stages.get("L5", {})
+        backend = l5.get("llm_backend")
+        if backend is not None and backend not in VALID_LLM_BACKENDS:
+            raise ValueError(
+                "L5.llm_backend must be one of: "
+                f"{', '.join(sorted(VALID_LLM_BACKENDS))}"
+            )
+
+        temperature = l5.get("llm_temperature")
+        if temperature is not None and not 0.0 <= float(temperature) <= 2.0:
+            raise ValueError("L5.llm_temperature must be in [0, 2]")
+
+        max_tokens = l5.get("llm_max_tokens")
+        if max_tokens is not None and int(max_tokens) <= 0:
+            raise ValueError("L5.llm_max_tokens must be positive")
+
+    def _validate_fusion_policy(self, data: dict[str, Any]) -> None:
+        ser = data.get("ser", {})
+        if isinstance(ser, dict):
+            router = ser.get("router")
+            if router is not None and router not in VALID_SER_ROUTERS:
+                raise ValueError(
+                    "fusion_policy.ser.router must be one of: "
+                    f"{', '.join(sorted(VALID_SER_ROUTERS))}"
+                )
+            confidence = ser.get("confidence_threshold")
+            if confidence is not None and not 0.0 <= float(confidence) <= 1.0:
+                raise ValueError(
+                    "fusion_policy.ser.confidence_threshold must be in [0, 1]"
+                )
+            switch_rate = ser.get("max_switch_rate")
+            if switch_rate is not None and not 0.0 <= float(switch_rate) <= 1.0:
+                raise ValueError("fusion_policy.ser.max_switch_rate must be in [0, 1]")
+
+        dtrb = data.get("dtrb", {})
+        if isinstance(dtrb, dict):
+            trigger = dtrb.get("trigger", {})
+            if isinstance(trigger, dict):
+                for key in ("min_va_distance", "min_disagreement_score"):
+                    value = trigger.get(key)
+                    if value is not None and float(value) < 0.0:
+                        raise ValueError(f"fusion_policy.dtrb.trigger.{key} must be non-negative")
+            max_adjustment = dtrb.get("max_va_adjustment")
+            if max_adjustment is not None and float(max_adjustment) <= 0.0:
+                raise ValueError("fusion_policy.dtrb.max_va_adjustment must be positive")
+
+        rrb = data.get("rrb", {})
+        if isinstance(rrb, dict):
+            max_bridge = rrb.get("max_bridge")
+            if max_bridge is not None and int(max_bridge) <= 0:
+                raise ValueError("fusion_policy.rrb.max_bridge must be positive")
+
+        llm = data.get("llm", {})
+        if isinstance(llm, dict):
+            backend = llm.get("backend")
+            if backend is not None and backend not in VALID_LLM_BACKENDS:
+                raise ValueError(
+                    "fusion_policy.llm.backend must be one of: "
+                    f"{', '.join(sorted(VALID_LLM_BACKENDS))}"
+                )
+            temperature = llm.get("temperature")
+            if temperature is not None and not 0.0 <= float(temperature) <= 2.0:
+                raise ValueError("fusion_policy.llm.temperature must be in [0, 2]")
+            max_tokens = llm.get("max_tokens")
+            if max_tokens is not None and int(max_tokens) <= 0:
+                raise ValueError("fusion_policy.llm.max_tokens must be positive")
 
     def _validate_weight_table(self, data: dict[str, Any]) -> None:
         missing = WEIGHT_TABLE_KEYS - set(data.keys())
