@@ -7,6 +7,7 @@ from typing import Any
 from src.core.context import DataContext, VALID_STAGES
 from src.layer1_feature.factory import run_l1
 from src.layer2_predict.predictor import run_l2
+from src.layer3_segment.fragment import run_l3
 from src.pipeline.stage_manager import StageManager
 
 
@@ -28,6 +29,8 @@ class PipelineRunner:
                 context = run_l1(context)
             elif stage == "L2":
                 context = run_l2(context)
+            elif stage == "L3":
+                context = run_l3(context)
             else:
                 context.metadata.setdefault("stage_status", {})[stage] = "pending"
                 skipped[stage] = "not_implemented"
