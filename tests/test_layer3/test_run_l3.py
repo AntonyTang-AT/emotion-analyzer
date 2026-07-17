@@ -126,3 +126,41 @@ def test_run_l3_memory_disabled_does_not_create_store(monkeypatch):
 
     assert result.metadata["stage_status"]["L3"] == "completed"
     assert result.memory_retrieved == []
+
+
+def test_run_l3_applies_cold_start_personalization():
+    context = DataContext.create(
+        user_id="brand-new-cold-start-user",
+        input_type="text",
+        text_content="hello",
+        profile_metadata={"segmentation_mode": "single"},
+        config_snapshot={
+            "pipeline": {
+                "pipeline": {
+                    "stages": {
+                        "L3": {
+                            "segmentation": {"use_va_type": "inter"},
+                            "baseline": {"enabled": False},
+                            "cold_start": {"enabled": True, "top_k_users": 3},
+                            "memory": {"enabled": False},
+                        }
+                    }
+                }
+            }
+        },
+    )
+    context.features = {"text": [{"start_time": 0.0, "end_time": 1.0}]}
+    context.va_self_predictions = {
+        "text": [VAConfidence(0.20, 0.10, 0.9)]
+    }
+    context.va_inter_predictions = {
+        "text": [VAConfidence(0.40, 0.50, 0.9)]
+    }
+
+    result = run_l3(context)
+
+    assert result.metadata["stage_status"]["L3"] == "completed"
+    assert result.metadata["l3_personalization"] == "cold_start"
+    adjusted = result.segments[0].va_self["text"]
+    assert adjusted.valence < 0.20
+    assert adjusted.valence != 0.20 or adjusted.arousal != 0.10

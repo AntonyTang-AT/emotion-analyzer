@@ -35,6 +35,24 @@ def test_pipeline_text_l2_completed(monkeypatch):
     assert self_len == len(result["features"]["text"])
 
 
+def test_pipeline_text_l3_completed(monkeypatch):
+    extractor = mock_text_extractor(monkeypatch)
+    monkeypatch.setitem(factory._EXTRACTOR_REGISTRY, "text", lambda: extractor)
+
+    result = run_pipeline(
+        input_type="text",
+        text_content="test text input",
+        text_subtype="dialogue",
+        config_overrides={
+            "pipeline": {"stages": {"L3": {"memory": {"enabled": False}}}}
+        },
+    )
+
+    assert result["stage_status"]["L3"] == "completed"
+    assert len(result["context"]["segments"]) >= 1
+    assert result["context"]["segments"][0]["id"].startswith("seg-")
+
+
 def test_pipeline_audio_l2_two_modalities(monkeypatch, sample_wav_path):
     text_extractor = mock_text_extractor(monkeypatch)
     monkeypatch.setattr(
