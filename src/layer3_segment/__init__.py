@@ -35,6 +35,11 @@ from src.layer3_segment.segment_controller import (
     segment_utterance,
 )
 from src.layer3_segment.memory_store import MemoryConfig, MemoryStore
+from src.layer3_segment.fragment import (
+    get_va_inter_embedding,
+    get_va_self_embedding,
+    run_l3,
+)
 
 __all__ = [
     "BaselineConfig",
@@ -56,10 +61,13 @@ __all__ = [
     "delta_vector_to_dict",
     "find_similar_users",
     "get_cold_start_delta",
+    "get_va_inter_embedding",
+    "get_va_self_embedding",
     "load_baseline",
     "load_population_baseline",
     "load_user_library",
     "run_calibration_session",
+    "run_l3",
     "save_baseline",
     "segment_dynamic",
     "segment_from_context",
