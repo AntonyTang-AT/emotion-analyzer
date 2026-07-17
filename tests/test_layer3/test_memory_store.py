@@ -100,6 +100,44 @@ def test_query_is_scoped_to_user(store: MemoryStore):
     assert [hit.fragment_id for hit in hits] == ["alice-fragment"]
 
 
+def test_shared_fragment_ids_do_not_collide_across_users(store: MemoryStore):
+    """Business IDs like seg-0000 must not overwrite another user's record."""
+    store.add_fragment(
+        "alice",
+        _vector(0),
+        _vector(0),
+        {
+            "fragment_id": "seg-0000",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "owner": "alice",
+        },
+    )
+    store.add_fragment(
+        "bob",
+        _vector(1),
+        _vector(1),
+        {
+            "fragment_id": "seg-0000",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "owner": "bob",
+        },
+    )
+
+    alice_hits = store.query_similar(
+        "alice", _vector(0), time_decay=False, embedding_type="inter"
+    )
+    bob_hits = store.query_similar(
+        "bob", _vector(1), time_decay=False, embedding_type="inter"
+    )
+
+    assert len(alice_hits) == 1
+    assert alice_hits[0].fragment_id == "seg-0000"
+    assert alice_hits[0].metadata["owner"] == "alice"
+    assert len(bob_hits) == 1
+    assert bob_hits[0].fragment_id == "seg-0000"
+    assert bob_hits[0].metadata["owner"] == "bob"
+
+
 def test_time_decay_changes_ranking(store: MemoryStore):
     # The old item has perfect similarity; the recent item is only slightly worse.
     store.add_fragment(

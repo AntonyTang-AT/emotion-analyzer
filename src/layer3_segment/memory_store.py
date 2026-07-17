@@ -122,15 +122,19 @@ class MemoryStore:
 
         timestamp = _normalise_timestamp(payload.get("timestamp"))
         payload["timestamp"] = timestamp
+        payload.setdefault("fragment_id", resolved_id)
         record_metadata = _record_metadata(
             user_id=user_id,
             fragment_id=resolved_id,
             timestamp=timestamp,
             payload=payload,
         )
+        # Namespace Chroma IDs by user so shared business IDs (e.g. seg-0000)
+        # from different users do not overwrite each other.
+        chroma_id = _storage_id(user_id, resolved_id)
 
         upsert_args = {
-            "ids": [resolved_id],
+            "ids": [chroma_id],
             "metadatas": [record_metadata],
         }
         self.collection_self.upsert(embeddings=[vector_self], **upsert_args)
@@ -181,18 +185,23 @@ class MemoryStore:
         current_time = _as_utc(now or datetime.now(timezone.utc))
 
         hits: list[MemoryHit] = []
-        for index, fragment_id in enumerate(ids):
+        for index, storage_id in enumerate(ids):
             raw_metadata = metadatas[index] if index < len(metadatas) else {}
             distance = float(distances[index]) if index < len(distances) else 1.0
             similarity = max(-1.0, min(1.0, 1.0 - distance))
             score = similarity
             metadata = _decode_payload(raw_metadata or {})
+            fragment_id = str(
+                metadata.get("fragment_id")
+                or raw_metadata.get("fragment_id")
+                or _business_fragment_id(str(storage_id), user_id)
+            )
             if time_decay:
                 age_days = _age_in_days(metadata.get("timestamp"), current_time)
                 score *= math.exp(-self.config.decay_alpha * age_days)
             hits.append(
                 MemoryHit(
-                    fragment_id=str(fragment_id),
+                    fragment_id=fragment_id,
                     score=float(score),
                     metadata=metadata,
                     embedding_type=resolved_type,
@@ -219,6 +228,21 @@ def _validate_user_id(user_id: str) -> str:
     if not value:
         raise ValueError("user_id must be non-empty")
     return value
+
+
+def _storage_id(user_id: str, fragment_id: str) -> str:
+    """Build a Chroma document ID namespaced by user."""
+    return f"{user_id}::{fragment_id}"
+
+
+def _business_fragment_id(storage_id: str, user_id: str) -> str:
+    """Recover the caller-facing fragment ID from a namespaced storage ID."""
+    prefix = f"{user_id}::"
+    if storage_id.startswith(prefix):
+        return storage_id[len(prefix) :]
+    if "::" in storage_id:
+        return storage_id.split("::", 1)[1]
+    return storage_id
 
 
 def _validate_embedding_type(embedding_type: str) -> None:
@@ -307,6 +331,7 @@ def _decode_payload(raw_metadata: Mapping[str, Any]) -> dict[str, Any]:
         result = {}
     result.setdefault("timestamp", raw_metadata.get("timestamp"))
     result.setdefault("user_id", raw_metadata.get("user_id"))
+    result.setdefault("fragment_id", raw_metadata.get("fragment_id"))
     return result
 
 
