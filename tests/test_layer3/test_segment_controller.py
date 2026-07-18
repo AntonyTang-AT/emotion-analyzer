@@ -66,10 +66,10 @@ def test_build_timeline_aligns_modalities_by_timestamp():
     assert frames[2].va_inter["speech"].valence == pytest.approx(0.9)
 
 
-def test_arousal_spike_splits_dynamic():
+def test_arousal_spike_splits_dynamic(mock_arousal_spike_va_sequence):
     frames = build_timeline(
         _context_with_series(
-            inter_series={"text": [_va(0.0, 0.1), _va(0.0, 0.15), _va(0.0, 0.8)]},
+            inter_series={"text": mock_arousal_spike_va_sequence},
         )
     )
     config = SegmentationConfig(
