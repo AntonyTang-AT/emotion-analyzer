@@ -28,6 +28,8 @@ def test_determine_quadrant_for_all_signs_and_boundaries():
     assert determine_quadrant(-0.2, -0.3) == "Q3"
     assert determine_quadrant(0.2, -0.3) == "Q4"
     assert determine_quadrant(0.0, 0.0) == "Q1"
+    assert determine_quadrant(0.0, -0.1) == "Q4"
+    assert determine_quadrant(-0.1, 0.0) == "Q2"
 
 
 def test_combined_va_uses_confidence_weights_by_default():
@@ -93,6 +95,17 @@ def test_evaluate_qbtd_returns_zero_intensity_when_below_threshold():
     assert result.quadrant == "Q3"
 
 
+def test_evaluate_qbtd_does_not_trigger_at_exact_threshold():
+    config = QuadrantThresholdConfig(quadrant_thresholds=(0.5, 0.65, 0.7, 0.55))
+    va_inter = {"text": _va(0.2, 0.3), "speech": _va(0.3, 0.4)}
+
+    result = evaluate_qbtd(va_inter, 0.5, config=config)
+
+    assert result.exceeds_threshold is False
+    assert result.intensity == pytest.approx(0.0)
+    assert result.strength_reference == pytest.approx(1.0)
+
+
 def test_evaluate_qbtd_can_read_max_distance_from_matrix():
     va_inter = {"text": _va(0.1, -0.2), "speech": _va(0.2, -0.3)}
     matrix = np.array([[0.0, 0.56], [0.56, 0.0]])
@@ -156,6 +169,37 @@ def test_config_from_pipeline_validates_threshold_count():
         )
 
 
+def test_config_from_pipeline_rejects_non_finite_thresholds():
+    with pytest.raises(ValueError, match="finite"):
+        QuadrantThresholdConfig.from_pipeline(
+            {
+                "pipeline": {
+                    "stages": {
+                        "L4": {
+                            "quadrant_thresholds": [0.5, float("nan"), 0.7, 0.55]
+                        }
+                    }
+                }
+            }
+        )
+
+
 def test_evaluate_qbtd_rejects_missing_distance():
     with pytest.raises(ValueError, match="max_distance or distance_matrix"):
         evaluate_qbtd({"text": _va(0.1, 0.2)})
+
+
+def test_evaluate_qbtd_rejects_non_finite_or_negative_distance():
+    va_inter = {"text": _va(0.1, 0.2), "speech": _va(0.2, 0.3)}
+
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        evaluate_qbtd(va_inter, float("inf"))
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        evaluate_qbtd(va_inter, -0.1)
+
+
+def test_combined_va_rejects_out_of_range_or_non_finite_va_values():
+    with pytest.raises(ValueError, match=r"\[-1, 1\]"):
+        combined_va({"text": _va(1.2, 0.0)})
+    with pytest.raises(ValueError, match="finite"):
+        combined_va({"text": {"valence": 0.1, "arousal": float("nan")}})

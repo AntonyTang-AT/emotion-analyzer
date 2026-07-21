@@ -6,6 +6,7 @@ VA quadrant, then compares the strongest cross-modality VA distance against it.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -106,8 +107,8 @@ def determine_quadrant(valence: float, arousal: float) -> str:
     Boundary values are assigned to the non-negative side so every valid VA
     point maps to exactly one quadrant.
     """
-    v = float(valence)
-    a = float(arousal)
+    v = _finite_float(valence, "valence")
+    a = _finite_float(arousal, "arousal")
     if v >= 0.0 and a >= 0.0:
         return "Q1"
     if v < 0.0 and a >= 0.0:
@@ -193,8 +194,8 @@ def evaluate_qbtd(
     quadrant = determine_quadrant(combined_valence, combined_arousal)
     threshold = threshold_for_quadrant(quadrant, config)
     distance = float(max_distance)
-    if distance < 0.0:
-        raise ValueError("max_distance must be non-negative")
+    if not math.isfinite(distance) or distance < 0.0:
+        raise ValueError("max_distance must be finite and non-negative")
 
     exceeds_threshold = config.enabled and distance > threshold
     return QBTDResult(
@@ -255,9 +256,9 @@ def _validate_thresholds(values: Sequence[Any]) -> tuple[float, float, float, fl
     if len(values) != 4:
         raise ValueError("quadrant_thresholds must contain exactly four values")
 
-    thresholds = tuple(float(value) for value in values)
+    thresholds = tuple(_finite_float(value, "quadrant_threshold") for value in values)
     if any(value < 0.0 for value in thresholds):
-        raise ValueError("quadrant_thresholds must be non-negative")
+        raise ValueError("quadrant_thresholds must be finite and non-negative")
     return thresholds  # type: ignore[return-value]
 
 
@@ -282,21 +283,47 @@ def _ordered_items(va_inter: Mapping[str, Any]) -> Iterable[tuple[str, Any]]:
 
 def _coerce_va(value: Any) -> tuple[float, float, float]:
     if isinstance(value, VAConfidence):
-        return float(value.valence), float(value.arousal), float(value.confidence)
+        return _validated_va(value.valence, value.arousal, value.confidence)
     if isinstance(value, Mapping):
-        return (
-            float(value["valence"]),
-            float(value["arousal"]),
-            float(value.get("confidence", 1.0)),
-        )
+        try:
+            valence = value["valence"]
+            arousal = value["arousal"]
+        except KeyError as exc:
+            raise ValueError(
+                "VA mapping values must contain valence and arousal"
+            ) from exc
+        return _validated_va(valence, arousal, value.get("confidence", 1.0))
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         if len(value) < 2:
             raise ValueError("VA sequence values must contain valence and arousal")
-        confidence = float(value[2]) if len(value) > 2 else 1.0
-        return float(value[0]), float(value[1]), confidence
+        confidence = value[2] if len(value) > 2 else 1.0
+        return _validated_va(value[0], value[1], confidence)
     raise TypeError(
         "VA values must be VAConfidence, mapping, or sequence of valence/arousal"
     )
+
+
+def _validated_va(
+    valence: Any,
+    arousal: Any,
+    confidence: Any,
+) -> tuple[float, float, float]:
+    v = _finite_float(valence, "valence")
+    a = _finite_float(arousal, "arousal")
+    c = _finite_float(confidence, "confidence")
+    if not -1.0 <= v <= 1.0 or not -1.0 <= a <= 1.0:
+        raise ValueError("VA valence and arousal must be in [-1, 1]")
+    return v, a, c
+
+
+def _finite_float(value: Any, name: str) -> float:
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"{name} must be numeric") from exc
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite")
+    return result
 
 
 __all__ = [
