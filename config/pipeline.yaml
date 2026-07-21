@@ -47,6 +47,7 @@ pipeline:
 
     L4:
       enabled: true
+      quadrant_threshold_enabled: true
       quadrant_thresholds: [0.50, 0.65, 0.70, 0.55]  # QBTD 四象限阈值（辅助）
       weight_strategy: rule_table    # rule_table | small_nn
       rule_table_path: config/weight_table.yaml
