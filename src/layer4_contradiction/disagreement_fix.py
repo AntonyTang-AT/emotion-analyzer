@@ -18,6 +18,8 @@ from src.utils.config_loader import load_config
 
 DEFAULT_FUSION = "default_fusion"
 DISAGREEMENT_FIX = "disagreement_fix"
+# Weight cut is independent from ``max_va_adjustment`` (which bounds fused-VA shift).
+OUTLIER_WEIGHT_REDUCTION_RATIO = 0.5
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ class DisagreementFixConfig:
     min_disagreement_score: float = 0.35
     max_va_adjustment: float = 0.15
     reason_guided: bool = False
+    swap_noise_first: bool = True
 
     @classmethod
     def from_fusion_policy(
@@ -45,6 +48,7 @@ class DisagreementFixConfig:
             min_disagreement_score=float(trigger.get("min_disagreement_score", 0.35)),
             max_va_adjustment=float(dtrb.get("max_va_adjustment", 0.15)),
             reason_guided=bool(dtrb.get("reason_guided", False)),
+            swap_noise_first=bool(dtrb.get("swap_noise_first", True)),
         )
 
 
@@ -128,6 +132,7 @@ def apply_disagreement_fix(
         modality_va,
         fused_before,
         max_pair=max_pair,
+        swap_noise_first=fix_config.swap_noise_first,
     )
     if not outlier_modalities:
         return DisagreementFixResult(
@@ -138,12 +143,12 @@ def apply_disagreement_fix(
         )
 
     adjusted_weights = list(current_weights)
-    reduction_budget = fix_config.max_va_adjustment
     for modality in outlier_modalities:
         index = MODALITIES.index(modality)
         original = adjusted_weights[index]
-        reduction = min(original * 0.5, reduction_budget)
-        adjusted_weights[index] = max(0.0, original - reduction)
+        adjusted_weights[index] = max(
+            0.0, original * (1.0 - OUTLIER_WEIGHT_REDUCTION_RATIO)
+        )
 
     candidate_weights = _normalize_weights(adjusted_weights)
     fused_after = _weighted_fusion_va(candidate_weights, modality_va)
@@ -198,9 +203,30 @@ def _select_outliers(
     fused_va: tuple[float, float],
     *,
     max_pair: tuple[str, str] | None,
+    swap_noise_first: bool = True,
 ) -> list[str]:
+    """Pick the modality to down-weight.
+
+    When ``swap_noise_first`` is True, prefer the lower-confidence modality in
+    ``max_pair`` (noise-first). When False, prefer the modality farthest from
+    the current fused VA among the pair.
+    """
     if max_pair is not None:
         left, right = max_pair
+        if left in confidences and right in confidences and left in modality_va and right in modality_va:
+            if swap_noise_first:
+                if confidences[left] <= confidences[right]:
+                    return [left]
+                return [right]
+            left_dist = _va_distance(_coerce_va(modality_va[left], left), fused_va)
+            right_dist = _va_distance(_coerce_va(modality_va[right], right), fused_va)
+            if left_dist > right_dist:
+                return [left]
+            if right_dist > left_dist:
+                return [right]
+            if confidences[left] <= confidences[right]:
+                return [left]
+            return [right]
         if left in confidences and right in confidences:
             if confidences[left] <= confidences[right]:
                 return [left]
@@ -218,7 +244,10 @@ def _select_outliers(
                 modality,
             )
         )
-    distances.sort(key=lambda item: (-item[0], item[1], item[2]))
+    if swap_noise_first:
+        distances.sort(key=lambda item: (item[1], -item[0], item[2]))
+    else:
+        distances.sort(key=lambda item: (-item[0], item[1], item[2]))
     if not distances:
         return []
     return [distances[0][2]]
@@ -286,6 +315,7 @@ def _normalize_weights(weights: Sequence[float]) -> list[float]:
 __all__ = [
     "DEFAULT_FUSION",
     "DISAGREEMENT_FIX",
+    "OUTLIER_WEIGHT_REDUCTION_RATIO",
     "DisagreementFixConfig",
     "DisagreementFixResult",
     "apply_disagreement_fix",

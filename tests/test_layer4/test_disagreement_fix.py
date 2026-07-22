@@ -142,3 +142,57 @@ def test_disagreement_fix_handles_missing_modalities_safely():
     if result.adjusted:
         assert result.audit_entries
         assert result.audit_entries[0]["va_shift"] <= 0.15 + 1e-9
+
+
+def test_swap_noise_first_prefers_low_confidence_over_farther_modality():
+    # text is closer to fused VA but noisier (low confidence);
+    # micro is farther but higher confidence.
+    weights = [0.7, 0.0, 0.0, 0.3]
+    modality_va = {
+        "text": _va(0.1, 0.0, 0.1),
+        "micro": _va(-1.0, 0.0, 0.95),
+    }
+    noise_first = apply_disagreement_fix(
+        weights,
+        modality_va,
+        disagreement_score=0.9,
+        max_distance=2.0,
+        max_pair=("text", "micro"),
+        config=DisagreementFixConfig(swap_noise_first=True, max_va_adjustment=0.5),
+    )
+    distance_first = apply_disagreement_fix(
+        weights,
+        modality_va,
+        disagreement_score=0.9,
+        max_distance=2.0,
+        max_pair=("text", "micro"),
+        config=DisagreementFixConfig(swap_noise_first=False, max_va_adjustment=0.5),
+    )
+
+    assert noise_first.adjusted is True
+    assert noise_first.audit_entries[0]["outlier_modalities"] == ["text"]
+    assert distance_first.adjusted is True
+    assert distance_first.audit_entries[0]["outlier_modalities"] == ["micro"]
+
+
+def test_weight_reduction_is_independent_of_max_va_adjustment():
+    """Tiny VA cap still allows a 50% weight cut before shift scaling."""
+    weights = [0.1, 0.2, 0.2, 0.5]
+    modality_va = {
+        "text": _va(0.8, 0.6, 0.95),
+        "speech": _va(0.1, 0.1, 0.9),
+        "macro": _va(0.0, 0.0, 0.9),
+        "micro": _va(-0.7, -0.5, 0.2),
+    }
+    result = apply_disagreement_fix(
+        weights,
+        modality_va,
+        disagreement_score=0.8,
+        max_distance=1.5,
+        max_pair=("text", "micro"),
+        config=DisagreementFixConfig(max_va_adjustment=0.01),
+    )
+
+    assert result.adjusted is True
+    assert result.audit_entries[0]["va_shift"] <= 0.01 + 1e-9
+    assert result.audit_entries[0]["outlier_modalities"] == ["micro"]
