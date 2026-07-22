@@ -16,6 +16,13 @@ from src.layer4_contradiction.va_distance import (
     VADistanceResult,
     calculate_va_distances,
 )
+from src.layer4_contradiction.disagreement_fix import (
+    DEFAULT_FUSION,
+    DISAGREEMENT_FIX,
+    DisagreementFixConfig,
+    DisagreementFixResult,
+    apply_disagreement_fix,
+)
 from src.layer4_contradiction.weight_selector import (
     WeightSelectionResult,
     WeightSelectorConfig,
@@ -24,6 +31,10 @@ from src.layer4_contradiction.weight_selector import (
 )
 
 __all__ = [
+    "DEFAULT_FUSION",
+    "DISAGREEMENT_FIX",
+    "DisagreementFixConfig",
+    "DisagreementFixResult",
     "ExpertRuleResult",
     "ExpertRulesConfig",
     "MAX_VA_DISTANCE",
@@ -32,6 +43,7 @@ __all__ = [
     "VADistanceResult",
     "WeightSelectionResult",
     "WeightSelectorConfig",
+    "apply_disagreement_fix",
     "calculate_va_distances",
     "classify_contradiction",
     "evaluate_qbtd",
