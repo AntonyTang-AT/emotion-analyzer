@@ -16,6 +16,12 @@ from src.layer4_contradiction.va_distance import (
     VADistanceResult,
     calculate_va_distances,
 )
+from src.layer4_contradiction.weight_selector import (
+    WeightSelectionResult,
+    WeightSelectorConfig,
+    get_weights,
+    select_weights,
+)
 
 __all__ = [
     "ExpertRuleResult",
@@ -24,8 +30,12 @@ __all__ = [
     "QBTDResult",
     "QuadrantThresholdConfig",
     "VADistanceResult",
+    "WeightSelectionResult",
+    "WeightSelectorConfig",
     "calculate_va_distances",
     "classify_contradiction",
     "evaluate_qbtd",
+    "get_weights",
     "same_sign",
+    "select_weights",
 ]
