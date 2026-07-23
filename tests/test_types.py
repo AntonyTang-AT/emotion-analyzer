@@ -79,5 +79,26 @@ def test_contradiction_result_to_dict_matches_config_weights(config_manager):
         involved_modalities=["text", "micro"],
         suggested_fusion_weights=table["masking"],
         routing_confidence=0.8,
+        disagreement_score=0.55,
+        routing_decision="typed_fusion",
+        fusion_audit_trail=[{"action": "typed_fusion"}],
     )
-    assert result.to_dict()["suggested_fusion_weights"] == table["masking"]
+    payload = result.to_dict()
+    assert payload["suggested_fusion_weights"] == table["masking"]
+    assert payload["disagreement_score"] == pytest.approx(0.55)
+    assert payload["routing_decision"] == "typed_fusion"
+    assert payload["fusion_audit_trail"] == [{"action": "typed_fusion"}]
+
+def test_contradiction_result_from_dict_compatible_with_legacy_payload():
+    restored = ContradictionResult.from_dict(
+        {
+            "contradiction_type": "consistent",
+            "contradiction_intensity": 0.2,
+            "involved_modalities": [],
+            "suggested_fusion_weights": [0.25, 0.25, 0.25, 0.25],
+            "routing_confidence": 0.3,
+        }
+    )
+    assert restored.disagreement_score == 0.0
+    assert restored.routing_decision.value == "default_fusion"
+    assert restored.fusion_audit_trail == []
