@@ -43,6 +43,12 @@ class ContradictionType(str, Enum):
     CONSISTENT = "consistent"
 
 
+class RoutingDecision(str, Enum):
+    DEFAULT_FUSION = "default_fusion"
+    TYPED_FUSION = "typed_fusion"
+    DISAGREEMENT_FIX = "disagreement_fix"
+
+
 FeatureDict = dict[str, Any]
 ModalityVADict = dict[str, "VAConfidence"]
 ModalityVASeriesDict = dict[str, list["VAConfidence"]]
@@ -77,10 +83,19 @@ class ContradictionResult:
     involved_modalities: list[str]
     suggested_fusion_weights: list[float]
     routing_confidence: float
+    disagreement_score: float = 0.0
+    routing_decision: RoutingDecision | str = RoutingDecision.DEFAULT_FUSION
+    fusion_audit_trail: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if isinstance(self.contradiction_type, str):
             self.contradiction_type = ContradictionType(self.contradiction_type)
+
+        if isinstance(self.routing_decision, str):
+            self.routing_decision = RoutingDecision(self.routing_decision)
+
+        if not 0.0 <= float(self.disagreement_score) <= 1.0:
+            raise ValueError("disagreement_score must be in [0, 1]")
 
         if len(self.suggested_fusion_weights) != len(MODALITIES):
             raise ValueError(
@@ -110,6 +125,11 @@ class ContradictionResult:
                 float(w) for w in self.suggested_fusion_weights
             ],
             "routing_confidence": float(self.routing_confidence),
+            "disagreement_score": float(self.disagreement_score),
+            "routing_decision": self.routing_decision.value,
+            "fusion_audit_trail": [
+                dict(entry) for entry in self.fusion_audit_trail
+            ],
         }
 
     @classmethod
@@ -122,6 +142,13 @@ class ContradictionResult:
                 float(w) for w in data["suggested_fusion_weights"]
             ],
             routing_confidence=float(data["routing_confidence"]),
+            disagreement_score=float(data.get("disagreement_score", 0.0)),
+            routing_decision=data.get(
+                "routing_decision", RoutingDecision.DEFAULT_FUSION.value
+            ),
+            fusion_audit_trail=[
+                dict(entry) for entry in data.get("fusion_audit_trail", [])
+            ],
         )
 
 
