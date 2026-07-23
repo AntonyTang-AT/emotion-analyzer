@@ -151,9 +151,9 @@ def test_non_default_routing_writes_audit_trail():
 
     result = context.segments[0].contradiction
     assert result is not None
-    if result.routing_decision != RoutingDecision.DEFAULT_FUSION:
-        assert result.fusion_audit_trail
-        assert any(
-            entry.get("action") in {"typed_fusion", "disagreement_fix"}
-            for entry in result.fusion_audit_trail
-        )
+    assert result.routing_decision != RoutingDecision.DEFAULT_FUSION
+    assert result.fusion_audit_trail
+    assert any(
+        entry.get("action") in {"typed_fusion", "disagreement_fix"}
+        for entry in result.fusion_audit_trail
+    )

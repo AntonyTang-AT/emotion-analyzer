@@ -22,6 +22,23 @@ def test_get_weights_reads_rule_table_for_known_type(config_manager):
     assert confidence == pytest.approx(0.5)
 
 
+@pytest.mark.parametrize(
+    "contradiction_type",
+    [
+        ContradictionType.MASKING,
+        ContradictionType.SARCASM,
+        ContradictionType.HIDDEN_EMOTION,
+        ContradictionType.INTENSITY_MISMATCH,
+        ContradictionType.CONSISTENT,
+    ],
+)
+def test_all_table_types_sum_to_one(config_manager, contradiction_type):
+    table = config_manager.load("weight_table")
+    weights, _ = get_weights(contradiction_type, 0.6, weight_table=table)
+    assert weights == pytest.approx(table[contradiction_type.value])
+    assert abs(sum(weights) - 1.0) < 0.01
+
+
 def test_get_weights_accepts_string_type_and_caps_confidence():
     weights, confidence = get_weights("hidden_emotion", 2.4)
 
